@@ -1454,42 +1454,280 @@ test_fixture_cleanup_stops_only_its_own_users
 test_fixture_timeout_scale
 
 test_herdr_leak_check() {
-  local tmp repo out rc row
+  local tmp repo out rc long_row real_readlink
   tmp=$(fm_test_tmproot fm-test-run-herdr-leaks)
   repo="$tmp/repo"
-  mkdir -p "$repo/bin" "$repo/tests" "$tmp/fakebin"
+  mkdir -p "$repo/bin" "$repo/tests" "$tmp/fakebin" "$tmp/proc" \
+    "$tmp/pre-existing-cwd" "$tmp/new-cwd" "$tmp/reused-cwd"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
   cp "$ROOT/tests/timing-helpers.sh" "$repo/tests/timing-helpers.sh"
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/tests/fm-fixture.test.sh"
+  cat > "$repo/tests/fm-fixture.test.sh" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_LEAK_RESTART_PID:-}" ]; then
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 %s 0\n' \
+    "$FM_LEAK_RESTART_PID" "$FM_LEAK_RESTART_START" \
+    > "$FM_TEST_RUN_PROC_ROOT/$FM_LEAK_RESTART_PID/stat"
+fi
+[ -z "${FM_LEAK_PORTABLE_RESTART_MARKER:-}" ] || : > "$FM_LEAK_PORTABLE_RESTART_MARKER"
+SH
   cat > "$tmp/fakebin/ps" <<'SH'
 #!/usr/bin/env bash
-[ "${FM_LEAK_PS_FAIL:-0}" = 0 ] || exit 1
-cat "$FM_LEAK_PS_ROWS"
+case " $* " in
+  *' -p '*' -o pid=,lstart=,stat=,args= '*)
+    [ "${FM_LEAK_PORTABLE_EXITED:-0}" = 0 ] || exit 1
+    [ "${FM_LEAK_PORTABLE_IDENTITY_FAIL:-0}" = 0 ] || exit 1
+    if [ -n "${FM_LEAK_PORTABLE_RESTART_MARKER:-}" ] &&
+      [ -f "$FM_LEAK_PORTABLE_RESTART_MARKER" ]; then
+      cat "$FM_LEAK_PORTABLE_IDENTITY_AFTER"
+    else
+      cat "$FM_LEAK_PORTABLE_IDENTITY_BEFORE"
+    fi
+    exit 0
+    ;;
+  *' -p '*' -o pid=,stat=,args= '*)
+    [ "${FM_LEAK_PORTABLE_EXITED:-0}" = 0 ] || exit 1
+    if [ -n "${FM_LEAK_PORTABLE_CANDIDATE:-}" ]; then
+      cat "$FM_LEAK_PORTABLE_CANDIDATE"
+    else
+      count=0
+      [ ! -f "$FM_LEAK_PS_CALLS" ] || IFS= read -r count < "$FM_LEAK_PS_CALLS"
+      if [ "$count" -le 1 ]; then cat "$FM_LEAK_PS_BEFORE"
+      else cat "$FM_LEAK_PS_AFTER"
+      fi
+    fi
+    exit 0
+    ;;
+  *' -p '*' -o pid= '*)
+    [ "${FM_LEAK_PORTABLE_EXITED:-0}" = 0 ] || exit 1
+    printf '%s\n' "$FM_LEAK_PORTABLE_PID"
+    exit 0
+    ;;
+esac
+count=0
+[ ! -f "$FM_LEAK_PS_CALLS" ] || IFS= read -r count < "$FM_LEAK_PS_CALLS"
+count=$((count + 1))
+printf '%s\n' "$count" > "$FM_LEAK_PS_CALLS"
+[ "${FM_LEAK_PS_FAIL_CALL:-0}" != "$count" ] || exit 1
+if [ "$count" -eq 1 ]; then rows=$FM_LEAK_PS_BEFORE
+else rows=$FM_LEAK_PS_AFTER
+fi
+case " $* " in
+  *' -ww '*) cat "$rows" ;;
+  *) cut -c 1-80 "$rows" ;;
+esac
 SH
-  chmod +x "$tmp/fakebin/ps"
-  for row in \
-    '42 S herdr server --session fm-remote' \
-    '43 S /nix/store/example/bin/herdr server --session=fm-lab-owned'; do
-    printf '%s\n' "$row" > "$tmp/rows"
-    rc=0
-    out=$(FM_LEAK_PS_ROWS="$tmp/rows" PATH="$tmp/fakebin:$PATH" \
-      "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
-    [ "$rc" -ne 0 ] || fail "a surviving Herdr test server passed: $row"
-    assert_contains "$out" 'Herdr servers survived the suite' "missing survivor diagnostic"
-  done
-  printf '%s\n' '44 S herdr server --session default' \
-    '45 S herdr status --session fm-lab-reader' \
-    '46 Z herdr server --session fm-lab-dead' > "$tmp/rows"
-  out=$(FM_LEAK_PS_ROWS="$tmp/rows" PATH="$tmp/fakebin:$PATH" \
-    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) \
-    || fail "default, readers, or zombies were mistaken for a live test server: $out"
-  assert_contains "$out" 'no fm-remote or fm-lab-* Herdr server survived' "missing clean inventory result"
+  cat > "$tmp/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+[ "${FM_LEAK_PORTABLE_LSOF_FAIL:-0}" = 0 ] || exit 1
+printf 'p%s\nn%s\n' "$FM_LEAK_PORTABLE_PID" "$FM_LEAK_PORTABLE_CWD"
+SH
+  chmod +x "$tmp/fakebin/ps" "$tmp/fakebin/lsof"
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 100 0\n' 42 > "$tmp/proc/42-stat"
+  mkdir -p "$tmp/proc/42"
+  mv "$tmp/proc/42-stat" "$tmp/proc/42/stat"
+  ln -s "$tmp/pre-existing-cwd" "$tmp/proc/42/cwd"
+  printf '%s\n' '42 S herdr server --session fm-remote' > "$tmp/before"
+  cp "$tmp/before" "$tmp/after"
+  rm -f "$tmp/ps-calls"
   rc=0
-  out=$(FM_LEAK_PS_FAIL=1 FM_LEAK_PS_ROWS="$tmp/rows" PATH="$tmp/fakebin:$PATH" \
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a pre-existing Herdr server failed a leak-free run: $out"
+  assert_contains "$out" "WARNING: pre-existing Herdr server remains after suite: pid=42 start=100 cwd=$tmp/pre-existing-cwd session=fm-remote" \
+    "pre-existing server warning omitted identity metadata"
+
+  mkdir -p "$tmp/proc/47"
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 200 0\n' 47 > "$tmp/proc/47/stat"
+  ln -s "$tmp/new-cwd" "$tmp/proc/47/cwd"
+  long_row="47 S /nix/store/$(printf '%090d' 0)/bin/herdr server --session fm-lab-wide"
+  : > "$tmp/before"
+  printf '%s\n' "$long_row" > "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a new Herdr server behind a long executable path passed"
+  assert_contains "$out" 'Herdr servers started during the suite' "missing new survivor diagnostic"
+  assert_contains "$out" $'47\t200\tfm-lab-wide\t'"$tmp/new-cwd" "new survivor omitted identity metadata"
+
+  mkdir -p "$tmp/proc/43"
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 300 0\n' 43 > "$tmp/proc/43/stat"
+  ln -s "$tmp/reused-cwd" "$tmp/proc/43/cwd"
+  printf '%s\n' '43 S /nix/store/example/bin/herdr server --session=fm-lab-owned' > "$tmp/before"
+  cp "$tmp/before" "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    FM_LEAK_RESTART_PID=43 FM_LEAK_RESTART_START=400 \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a Herdr server with a reused pid passed"
+  assert_contains "$out" $'43\t400\tfm-lab-owned\t'"$tmp/reused-cwd" "reused pid survivor omitted its new identity"
+
+  printf '%s\n' '44 S herdr server --session default' \
+    '45 S herdr status --session fm-lab-reader' '46 Z herdr server --session fm-lab-dead' > "$tmp/before"
+  cp "$tmp/before" "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) \
+    || fail "default, readers, or zombies were mistaken for a live test server: $out"
+  assert_contains "$out" 'no new fm-remote or fm-lab-* Herdr server survived' "missing clean inventory result"
+
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_FAIL_CALL=1 FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable baseline inventory passed the Herdr leak check"
+  assert_contains "$out" 'could not inspect Herdr server processes before the suite' "missing baseline inventory failure diagnostic"
+
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_FAIL_CALL=2 FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an unreadable final inventory passed the Herdr leak check"
+  assert_contains "$out" 'could not inspect Herdr server processes after the suite' "missing final inventory failure diagnostic"
+
+  printf '%s\n' '52 S herdr server --session fm-remote' > "$tmp/portable-candidate"
+  printf '%s\n' '52 Fri Sep 5 08:00:00 2026 S herdr server --session fm-remote' > "$tmp/portable-identity-before"
+  cp "$tmp/portable-identity-before" "$tmp/portable-identity-after"
+  cp "$tmp/portable-candidate" "$tmp/before"
+  cp "$tmp/portable-candidate" "$tmp/after"
+  rm -f "$tmp/ps-calls" "$tmp/portable-restarted"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_PID=52 FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-identity-before" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-identity-after" \
+    FM_LEAK_PORTABLE_CWD="$tmp/pre-existing-cwd" PATH="$tmp/fakebin:$PATH" \
     "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "unreadable process inventory passed the Herdr leak check"
-  assert_contains "$out" 'could not inspect Herdr server processes' "missing inventory failure diagnostic"
-  pass "Herdr leak check refuses live test servers and unreadable inventory without lifecycle calls"
+  [ "$rc" -ne 0 ] || fail "an indistinguishable portable Herdr identity passed the leak check"
+  assert_contains "$out" $'52\tportable-unverified:Fri Sep 5 08:00:00 2026\tfm-remote\t'"$tmp/pre-existing-cwd" \
+    "indistinguishable portable survivor omitted identity metadata"
+
+  : > "$tmp/before"
+  cp "$tmp/portable-candidate" "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_PID=52 FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-identity-before" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-identity-after" \
+    FM_LEAK_PORTABLE_CWD="$tmp/new-cwd" PATH="$tmp/fakebin:$PATH" \
+    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a new portable Herdr identity passed"
+  assert_contains "$out" $'52\tportable-unverified:Fri Sep 5 08:00:00 2026\tfm-remote\t'"$tmp/new-cwd" \
+    "new portable survivor omitted identity metadata"
+
+  cp "$tmp/portable-candidate" "$tmp/before"
+  : > "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_EXITED=1 FM_LEAK_PORTABLE_PID=52 \
+    FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-identity-before" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-identity-after" \
+    FM_LEAK_PORTABLE_CWD="$tmp/pre-existing-cwd" PATH="$tmp/fakebin:$PATH" \
+    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "an exited portable candidate failed the inventory: $out"
+
+  cp "$tmp/portable-candidate" "$tmp/before"
+  cp "$tmp/portable-candidate" "$tmp/after"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_IDENTITY_FAIL=1 FM_LEAK_PORTABLE_PID=52 \
+    FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-identity-before" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-identity-after" \
+    FM_LEAK_PORTABLE_CWD="$tmp/pre-existing-cwd" PATH="$tmp/fakebin:$PATH" \
+    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "an unavailable portable start identity passed"
+  assert_contains "$out" 'could not inspect Herdr server processes before the suite' \
+    "portable identity failure omitted the inventory diagnostic"
+
+  cp "$tmp/portable-identity-before" "$tmp/portable-identity-after"
+  rm -f "$tmp/ps-calls" "$tmp/portable-restarted"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_RESTART_MARKER="$tmp/portable-restarted" FM_LEAK_PORTABLE_PID=52 \
+    FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-identity-before" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-identity-after" \
+    FM_LEAK_PORTABLE_CWD="$tmp/reused-cwd" PATH="$tmp/fakebin:$PATH" \
+    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a restarted portable Herdr identity passed"
+  assert_contains "$out" $'52\tportable-unverified:Fri Sep 5 08:00:00 2026\tfm-remote\t'"$tmp/reused-cwd" \
+    "same-second replacement omitted its fail-closed identity metadata"
+
+  real_readlink=$(command -v readlink)
+  cat > "$tmp/fakebin/readlink" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "$FM_LEAK_RACE_CWD" ] && [ ! -f "$FM_LEAK_RACE_MARKER" ]; then
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 %s 0\n' \
+    "$FM_LEAK_RACE_PID" "$FM_LEAK_RACE_AFTER_START" > "$FM_LEAK_RACE_STAT"
+  : > "$FM_LEAK_RACE_MARKER"
+fi
+exec "$FM_LEAK_REAL_READLINK" "$@"
+SH
+  chmod +x "$tmp/fakebin/readlink"
+  mkdir -p "$tmp/proc/53"
+  printf '%s (herdr) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 500 0\n' 53 > "$tmp/proc/53/stat"
+  ln -s "$tmp/reused-cwd" "$tmp/proc/53/cwd"
+  printf '%s\n' '53 S herdr server --session fm-remote' > "$tmp/linux-race-candidate"
+  cp "$tmp/linux-race-candidate" "$tmp/before"
+  cp "$tmp/linux-race-candidate" "$tmp/after"
+  rm -f "$tmp/ps-calls" "$tmp/linux-race-marker"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/proc" \
+    FM_LEAK_PORTABLE_CANDIDATE="$tmp/linux-race-candidate" \
+    FM_LEAK_RACE_PID=53 FM_LEAK_RACE_AFTER_START=600 \
+    FM_LEAK_RACE_CWD="$tmp/proc/53/cwd" FM_LEAK_RACE_STAT="$tmp/proc/53/stat" \
+    FM_LEAK_RACE_MARKER="$tmp/linux-race-marker" FM_LEAK_REAL_READLINK="$real_readlink" \
+    PATH="$tmp/fakebin:$PATH" "$repo/bin/fm-test-run.sh" --jobs 1 \
+    --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a Herdr replacement during baseline collection passed"
+  assert_contains "$out" 'could not inspect Herdr server processes before the suite' \
+    "baseline replacement race omitted the inventory failure"
+  assert_contains "$out" $'53\t600\tfm-remote\t'"$tmp/reused-cwd" \
+    "replacement during baseline collection was not reported as new"
+
+  : > "$tmp/before"
+  cp "$tmp/portable-candidate" "$tmp/after"
+  printf '%s\n' '52 Fri Sep 5 08:00:00 2026 S herdr server --session fm-lab-replacement' \
+    > "$tmp/portable-session-replacement"
+  printf '%s\n' '52 S herdr server --session fm-lab-replacement' \
+    > "$tmp/portable-session-candidate"
+  rm -f "$tmp/ps-calls"
+  rc=0
+  out=$(FM_LEAK_PS_BEFORE="$tmp/before" FM_LEAK_PS_AFTER="$tmp/after" \
+    FM_LEAK_PS_CALLS="$tmp/ps-calls" FM_TEST_RUN_PROC_ROOT="$tmp/no-proc" \
+    FM_LEAK_PORTABLE_PID=52 FM_LEAK_PORTABLE_CANDIDATE="$tmp/portable-session-candidate" \
+    FM_LEAK_PORTABLE_IDENTITY_BEFORE="$tmp/portable-session-replacement" \
+    FM_LEAK_PORTABLE_IDENTITY_AFTER="$tmp/portable-session-replacement" \
+    FM_LEAK_PORTABLE_CWD="$tmp/reused-cwd" PATH="$tmp/fakebin:$PATH" \
+    "$repo/bin/fm-test-run.sh" --jobs 1 --check-herdr-leaks tests/fm-fixture.test.sh 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a portable Herdr session replacement passed"
+  assert_contains "$out" 'could not inspect Herdr server processes after the suite' \
+    "portable session replacement was omitted instead of failing inventory"
+  pass "Herdr leak check preserves Linux and portable baseline identity contracts"
 }
 
 test_herdr_leak_check
