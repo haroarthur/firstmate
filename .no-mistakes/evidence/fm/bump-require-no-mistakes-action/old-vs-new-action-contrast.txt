@@ -1,0 +1,9 @@
+# require-no-mistakes verify.py: OLD pin vs NEW pin
+
+OLD pin 32d396ac (pre-change) live-lookup symbols (live_pr_facts/urllib.request/GITHUB_API_URL):
+0
+  -> 0 = old action judged the CACHED event payload (the staleness race)
+
+NEW pin 76fa0921 (this change) live-lookup symbols:
+7
+  -> >0 = new action reads live PR body/head from the GitHub API

@@ -1,0 +1,8 @@
+# Semantic parse of .github/workflows/no-mistakes-required.yml (target commit)
+
+permissions: {"contents": "read", "pull-requests": "read"}
+job 'check' step uses: kunchenguid/no-mistakes/.github/actions/require-no-mistakes@76fa0921a9797b09e120c8b5979c4d0e65f88922
+
+ASSERTIONS PASSED:
+  - permissions.pull-requests == 'read'  (live-lookup grant)
+  - require-no-mistakes pinned to @76fa0921... (live PR facts action)

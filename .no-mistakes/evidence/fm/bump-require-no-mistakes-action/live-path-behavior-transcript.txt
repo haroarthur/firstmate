@@ -1,0 +1,41 @@
+========================================================================
+SCENARIO A: live lookup 403s (workflow lacks pull-requests: read)
+Cached event payload contains a VALID attestation that would PASS if judged.
+========================================================================
+exit code: 1
+::error::Could not verify this PR's live body/head via the GitHub API, so require-no-mistakes cannot safely evaluate compliance: falling back to the workflow's own cached event payload risks certifying a stale, already-superseded verdict if this job was rerun (see verify.py's module docstring).
+
+Add `pull-requests: read` to this workflow's `permissions:` so require-no-mistakes can verify against live PR state, or forward explicit `pr-body`/`pr-head-sha` inputs to bypass the live lookup entirely.
+
+PR author: someone
+>>> PASS: failed CLOSED, did NOT certify the passing cached payload
+
+========================================================================
+SCENARIO B: live lookup 200 with a FRESH body bound to live head
+Cached payload head differs; action must judge LIVE state, not cache.
+========================================================================
+exit code: 0
+Found no-mistakes signature in PR #3755 body.
+Found structurally compliant pipeline step attestation.
+::warning::PR-body attestation is author-editable and is not cryptographic proof that no-mistakes produced it.
+>>> PASS: judged LIVE PR state and passed
+
+========================================================================
+SCENARIO C: live lookup 200 but live head has ADVANCED past attestation
+(the race the fix targets: stale attestation vs current head)
+========================================================================
+exit code: 1
+Found no-mistakes signature in PR #3755 body.
+::error::Pipeline attestation head_sha does not match the current PR head.
+
+attestation.head_sha: 1111111111111111111111111111111111111111
+PR head: 2222222222222222222222222222222222222222
+
+A later push must not pass on an older attestation. Re-run 'git push no-mistakes' so the PR body attestation binds to the current head.
+
+See CONTRIBUTING.md for setup and the full workflow.
+
+PR author: someone
+>>> PASS: live head/attestation mismatch named both SHAs and failed
+
+ALL LIVE-PATH SCENARIOS PASSED
