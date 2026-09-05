@@ -1,0 +1,25 @@
+==============================================================================
+SCENARIO 1: live API returns 200 with FRESH head; cached rerun payload is STALE
+  Expected: gate PASSES on live facts, ignoring the stale cached event payload.
+==============================================================================
+exit=0
+Found no-mistakes signature in PR #3755 body.
+Found structurally compliant pipeline step attestation.
+::warning::PR-body attestation is author-editable and is not cryptographic proof that no-mistakes produced it.
+
+>> RESULT: PASS - judged live fresh state, stale rerun payload did NOT resurrect a failure
+
+==============================================================================
+SCENARIO 2: live API 403s (workflow lacks pull-requests: read) - zero inputs
+  Expected: gate FAILS CLOSED, does NOT fall back to the cached event payload.
+==============================================================================
+exit=1
+::error::Could not verify this PR's live body/head via the GitHub API, so require-no-mistakes cannot safely evaluate compliance: falling back to the workflow's own cached event payload risks certifying a stale, already-superseded verdict if this job was rerun (see verify.py's module docstring).
+
+Add `pull-requests: read` to this workflow's `permissions:` so require-no-mistakes can verify against live PR state, or forward explicit `pr-body`/`pr-head-sha` inputs to bypass the live lookup entirely.
+
+PR author: contributor
+
+>> RESULT: PASS - failed closed with pull-requests: read guidance, no stale-payload fallback
+
+OVERALL: ALL SCENARIOS PASS
