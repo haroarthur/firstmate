@@ -25,7 +25,8 @@ cleanup() {
     "$ROOT/bin/fm-procevent.sh" sweep-home >/dev/null 2>&1 || true
   if [ -f "$TMP_ROOT/remote-jobs/worker.pid" ]; then
     worker_pid=$(cat "$TMP_ROOT/remote-jobs/worker.pid")
-    fm_remote_job_stop_worker_tree "$worker_pid" || true
+    fm_remote_job_resolve_stop_owner "$worker_pid" &&
+      fm_remote_job_stop_worker_tree "$FM_REMOTE_JOB_STOP_PID" "$FM_REMOTE_JOB_STOP_START" || true
   fi
   rm -rf -- "$TMP_ROOT"
 }
