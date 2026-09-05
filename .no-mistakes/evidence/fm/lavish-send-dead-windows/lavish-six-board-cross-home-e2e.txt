@@ -1,0 +1,37 @@
+Six open boards linked from two Firstmate homes:
+  http://localhost:4988/session/c7de37bdae8a2412
+  http://127.0.0.1:4988/session/7b91c22a6513c54b
+  http://localhost:4988/session/412fff30b15bd3b8
+  http://127.0.0.1:4988/session/f81a909769152636
+  http://localhost:4988/session/4fba339929b46190
+  http://127.0.0.1:4988/session/69731344ff37b3a3
+
+Fallback host counts before churn:
+      3 127.0.0.1
+      3 localhost
+
+Stable re-link from the other home:
+  first=http://localhost:4988/session/c7de37bdae8a2412
+  rerun=http://localhost:4988/session/c7de37bdae8a2412
+
+Persisted shared map mode after churn:
+  mode=600
+
+After ending one 127.0.0.1 board and linking a replacement:
+  replacement=http://127.0.0.1:4988/session/83bdeca3bd7cf483
+  stable-before=http://localhost:4988/session/c7de37bdae8a2412
+  stable-after=http://localhost:4988/session/c7de37bdae8a2412
+
+Active map host counts after churn:
+      3 127.0.0.1
+      3 localhost
+
+Active persisted rows after churn:
+  v1	4988	c7de37bdae8a2412	localhost
+  v1	4988	412fff30b15bd3b8	localhost
+  v1	4988	f81a909769152636	127.0.0.1
+  v1	4988	4fba339929b46190	localhost
+  v1	4988	69731344ff37b3a3	127.0.0.1
+  v1	4988	83bdeca3bd7cf483	127.0.0.1
+
+Result: six active boards remain balanced 3/3, the surviving board is stable, and the ended key was pruned.
