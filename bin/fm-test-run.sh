@@ -201,7 +201,7 @@ herdr_portable_process_identity() { # <pid> <session>
     return 1
   fi
   [ "$confirmed" = "$identity" ] || return 1
-  printf '%s\t%s\n' "${identity%%$'\t'*}" "$cwd"
+  printf 'portable-unverified:%s\t%s\n' "${identity%%$'\t'*}" "$cwd"
 }
 
 herdr_server_snapshot() { # <output> <processes> <candidates>
@@ -250,6 +250,7 @@ herdr_server_snapshot() { # <output> <processes> <candidates>
 }
 
 herdr_baseline_has_identity() { # <baseline> <pid> <start>
+  case "$3" in portable-unverified:*) return 1 ;; esac
   awk -F '\t' -v pid="$2" -v start="$3" '
     $1 == pid && $2 == start { found = 1 }
     END { exit !found }
