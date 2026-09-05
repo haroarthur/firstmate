@@ -1,0 +1,207 @@
+FM_TEST_BEGIN 2026-09-05T01:45:36Z tests/fm-captain-hold-lifecycle.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-09-05T01:45:36Z tests/fm-test-run.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - exact suite coverage: --all lists every tests/*.test.sh once
+ok - family selection returns a proper subset of the suite
+ok - single-script selection lists exactly that path
+ok - changed-file selection stays conservative (never silent full suite)
+ok - runner and its documentation surfaces select their curated family, not just their contract owners
+ok - changed selection covers dependents and fails closed for unmapped source
+ok - a bin reference selects the referencing scripts, and consumers still select their curated families
+ok - changed defaults to bounded automatic scheduling with serial override
+ok - a plain script list defaults to bounded automatic concurrency without an automatic timeout
+ok - family proofs run concurrently only within separate family phases
+ok - empty changed selection emits deterministic text and JSON summaries
+ok - timing markers and JSON artifact are valid
+ok - aggregate exit reflects any script failure
+ok - gate-skip accounting is honest and non-failing
+ok - fail-on-gate-skip converts herdr-not-found into a hard failure
+ok - exclude-family drops the named primary family after selection
+ok - portable shard union, disjointness, and coverage guard hold
+ok - portable serial shards are a deterministic disjoint cover of the serial lane
+ok - coverage guard reports and bounds the unmeasured portable serial share
+ok - portable serial shard lanes refuse mismatched, out-of-range, and countless names
+ok - --jobs refuses non-proven / stateful selections
+ok - --jobs admits and schedules a family with a recorded concurrent proof
+ok - an unclassified new test stays serial while the proven residual family runs concurrently
+ok - a concurrent run starts the longest-hint script first
+ok - --per-script-timeout-secs turns a hung script into a bounded failure
+ok - --max-wall-ms fails an over-budget run and refuses a malformed budget
+ok - jobs scheduler runs proven scripts; failure propagates; non-proven refused
+ok - Herdr CI family-run step times out at 20 min under a 75 min job backstop
+ok - aggregate-json merges lane timing artifacts
+FM_TEST_END 2026-09-05T01:47:31Z tests/fm-test-run.test.sh exit=0 duration_ms=127125 gate_skip=false
+ok - report-only unresolved captain call is reproduced and completion refuses before loss
+ok - the completion gate attests captain-held inventory and transfers open status decisions
+ok - answer records the captain's words, closes idempotently, and releases routed work
+ok - release frees held work with the captain's words recorded and the body preserved
+ok - a deferred captain call leaves the live Captain's Call until its date and stays answerable
+ok - an out-of-band close is recordable with the captain's word and nothing else
+ok - ended visual review follows the same captain-hold completion owner
+ok - resolved findings and decision-like prose do not create captain-held tasks
+ok - terminal single-owner stale status decisions do not block empty inventory
+ok - main-home and secondmate-home captain calls remain correctly routed
+ok - a secondmate home publishes each hold occurrence and its answer on the parent channel
+ok - a bound channel's captured answers close their captain-held tasks at answer time
+ok - a channel source with no decision binding closes nothing
+ok - legacy identities, metadata, bindings, and the shim keep working
+ok - the chat channel feeds the same keyed-answer intake a captured review does
+ok - completion and verification validate origins before constructing paths
+ok - a status resolution over a still-open captain-held task is signalled, not closed
+ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+ok - cleanup leaves a captain-held work item open with its deliverable, and only an answer closes it
+ok - an interrupted cleanup keeps the captain call recoverable and session start retains it
+ok - cleanup retains captain calls in the configured backlog
+ok - cleanup refuses a ship row when its captain hold cannot be read
+FM_TEST_END 2026-09-05T01:47:41Z tests/fm-captain-hold-lifecycle.test.sh exit=0 duration_ms=136443 gate_skip=false
+FM_TEST_BEGIN 2026-09-05T01:47:41Z tests/fm-bearings-board.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-09-05T01:47:41Z tests/fm-calm-pi-extension.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - path prints the stable home-scoped board location
+ok - build refuses malformed payloads before touching the board
+ok - charted kind is optional and accepts queued and warning
+ok - build injects the payload, binds any-origin, then arms the source
+not-autohandled: lavish-e425ccf369b777ad (left for the handler; still unacknowledged)
+ok - registration can consume answers only after any-origin binding exists
+ok - build establishes the Lavish session before binding and arming
+ok - rebuild refreshes the board in place without double-arming
+ok - build refuses a template without exactly one data slot
+FM_TEST_END 2026-09-05T01:47:47Z tests/fm-bearings-board.test.sh exit=0 duration_ms=6488 gate_skip=false
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - Pi calm compatibility evidence never rejects a Pi version for being newer than 0.82.0, and still fails closed on a missing or malformed version
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - missing Pi presentation class exports reach the independent adapter degradation path
+skip: installed @earendil-works/pi-coding-agent package not found
+skip: installed @earendil-works/pi-coding-agent package not found
+skip: installed @earendil-works/pi-coding-agent package not found
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - Pi operational follow-up E2E processes exact user-role notifications once while Calm hides current and adjacent rows, Calm off and absent render them, and restart preserves semantics
+ok - Pi Calm native /skill:ahoy geometry keeps every collapsed thinking and tool block at zero height while preserving expansion, history, restart, and Calm-off rendering
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+FM_TEST_END 2026-09-05T01:48:06Z tests/fm-calm-pi-extension.test.sh exit=0 duration_ms=27646 gate_skip=true
+FM_TEST_BEGIN 2026-09-05T01:48:06Z tests/fm-procevent.test.sh family=standalone expected_gate_skip=none
+FM_TEST_BEGIN 2026-09-05T01:48:06Z tests/fm-extension-binding.test.sh family=standalone expected_gate_skip=none
+ok - unknown extension conformance section selectors fail before setup
+not-autohandled: example-file (left for the handler; still unacknowledged)
+not-autohandled: flow-source (left for the handler; still unacknowledged)
+ok - the section coordinator propagates ordered failures and bounded cleanup
+ok - the shipped file-signal package is a runnable end-to-end external adapter
+ok - one external adapter registers, invokes, captures unhandled evidence, classifies, and terminally retires end to end
+not-autohandled: remote-source (left for the handler; still unacknowledged)
+not-autohandled: example-symlinked (left for the handler; still unacknowledged)
+ok - serialized remote binding crosses fm-on through addressed-home capture and retirement
+
+all extension-binding tests passed
+ok - a home reached through a symlinked ancestor captures external evidence normally
+ok - inner result.silent host crash releases the parent lifecycle lock before terminal retry
+ok - handshake execution rejects and reaps foreground descendants
+
+all extension-binding tests passed
+ok - local binding retirement requires its exact identity and disables invocation
+
+all extension-binding tests passed
+ok - independent extension conformance sections complete through isolated public homes
+
+all extension-binding tests passed
+FM_TEST_END 2026-09-05T01:48:16Z tests/fm-extension-binding.test.sh exit=0 duration_ms=10278 gate_skip=false
+ok - no configured source means no generated state and no process
+ok - one blocking completion yields exactly one bounded normalized event
+ok - a home reached through a symlinked ancestor runs its sources normally
+not-autohandled: direct-src (left for the handler; still unacknowledged)
+ok - public start owns the process group recorded by its claim
+ok - public start never claims an inherited caller process group
+ok - an unhandled result survives restart and repeat drains, and only explicit acknowledgement stops its re-announcement
+ok - publication cannot race a handled acknowledgement
+ok - handled acknowledgement creation is private and fails safely
+ok - automatic application waits for durable publication and failed publication remains recoverable
+ok - a self-announcing adapter applies quietly and still publishes what it could not apply
+not-autohandled: ends-src (left for the handler; still unacknowledged)
+ok - an adapter-classified terminal result is captured once, announced, and retires its source automatically
+not-autohandled: open-src (left for the handler; still unacknowledged)
+ok - a source stays armed unless its own adapter classifies the result terminal
+not-autohandled: replace-src (left for the handler; still unacknowledged)
+ok - terminal retirement preserves and releases a concurrently replaced registration
+ok - failed terminal retirement is fail-closed and idempotently recoverable
+ok - one Send & End yields exactly one captured result, automatic retirement, and no recurring poll
+ok - an empty board close is captured and recorded handled without ever waking the captain
+ok - a board close carrying the captain's real answer is still announced
+ok - a transient Lavish poll interruption is retried quietly and never announced
+not-autohandled: lavish-2e6b25dbcb445558 (left for the handler; still unacknowledged)
+ok - an interruption that outlives the bounded retries is captured and announced
+not-autohandled: lavish-aca6c588de5adca9 (left for the handler; still unacknowledged)
+ok - only the exact interruption is retried; an unrelated SERVER_ERROR still surfaces
+not-autohandled: lavish-d2d341c474346259 (left for the handler; still unacknowledged)
+ok - only the literal two-line interruption enters the quiet retry policy
+ok - arm rejects malformed and out-of-range retry delays before registration
+ok - poll cleanup safely handles an apostrophe-containing TMPDIR
+ok - Lavish classification staging stays bounded while nonmatches stream
+ok - a drained-but-unhandled result survives a replacement session and is retired only by explicit handling, never twice
+ok - pending results preserve numeric order and distinct wake identity
+ok - one owner per canonical source across homes
+ok - retiring a never-completing source stops its runner and its blocked child
+ok - reconcile reaps a runner whose source registration is gone
+not-autohandled: stale-src (left for the handler; still unacknowledged)
+ok - stale-owner recovery removes abandoned output without displacing a live owner
+not-autohandled: cross-home-src (left for the handler; still unacknowledged)
+ok - cross-home stale recovery removes abandoned output from the old state directory
+not-autohandled: race-src (left for the handler; still unacknowledged)
+not-autohandled: race-src (left for the handler; still unacknowledged)
+ok - concurrent stale-claim replacement starts exactly one runner
+ok - a crashed runner leader never lets a live owned group be reclaimed as stale
+ok - a truly dead generation with no surviving group is still safely reclaimed
+ok - claim replacement cannot produce a torn ownership snapshot
+ok - retirement and start share one serialized lifecycle boundary
+ok - PID reuse cannot signal an unrelated process
+ok - transient identity failure preserves the live source for retry
+ok - bounded home sweep preflights then retires every locally owned source
+ok - home sweep leaves foreign-home claims and runners untouched
+ok - home sweep refuses safely until runner identity is readable
+ok - healthy runtime behavior remains registration-only
+ok - registration rejects unrepresentable newline arguments
+ok - nonzero exit with no output stays armed and silent
+ok - oversized output is bounded rather than published whole or dropped
+ok - live output stays bounded and retirement reaps the whole source group
+ok - invalid output bounds fail closed
+ok - the adapter derives physical identity without newline path corruption
+ok - source-only homes trigger the general supervision guard
+ok - the adapter classifies published poll output safely
+ok - the adapter owns which Lavish results end a source, and payload text cannot forge one
+ok - the adapter owns which Lavish results are silent, and fails closed on everything else
+ok - read presents every annotation and a distinct session-ending message
+ok - read never certifies rows missing declared fields as complete
+ok - read keeps every annotation when the session-ending message is absent
+ok - read surfaces a typed comment on an annotated element
+ok - read still surfaces a typed comment that matches the element text
+ok - read still presents a pure annotation with no comment
+ok - read does not present choice context as a comment
+ok - read still presents a pure message with no selector
+ok - read distinguishes a feedback capture from an ended-with-nothing close
+ok - an adapter with no silence verdict keeps announcing every result
+ok - link serializes cross-home allocation without an external flock command
+ok - link stably balances six colliding session keys across both loopback hosts
+ok - link prunes ended sessions while preserving balanced open assignments
+ok - link warns with the accepted alias path when fallback exceeds six boards
+ok - link prefers an alias only after a successful 200 health probe
+ok - link preserves TLS, IPv6, and remote URLs and derives omitted ports from the URL scheme
+ok - link rejects missing, ended, incomplete, and invalid requests without serving or polling
+ok - the published interfaces state the loss limitation and claim no lossless delivery
+
+all procevent tests passed
+FM_TEST_END 2026-09-05T01:49:20Z tests/fm-procevent.test.sh exit=0 duration_ms=82950 gate_skip=false
+FM_TEST_BEGIN 2026-09-05T01:49:20Z tests/fm-bearings-board-render.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - a warning row badges needs repair while queued work keeps waiting
+ok - the charted next count counts queued work only, and still renders warnings
+ok - a warning-only board reports nothing queued and still shows the warning
+ok - omitted warnings remain separate from omitted queued work
+ok - an omitted kind renders exactly as queued work always did
+FM_TEST_END 2026-09-05T01:49:22Z tests/fm-bearings-board-render.test.sh exit=0 duration_ms=2066 gate_skip=false
+FM_TEST_SUMMARY total=7 failed=0 skipped_gate=1 duration_ms=249481
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=4 duration_ms=297702 failed=0
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=1 duration_ms=2066 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=93228 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-captain-hold-lifecycle.test.sh duration_ms=136443
+FM_TEST_SLOWEST rank=2 script=tests/fm-test-run.test.sh duration_ms=127125
+FM_TEST_SLOWEST rank=3 script=tests/fm-procevent.test.sh duration_ms=82950
+FM_TEST_SLOWEST rank=4 script=tests/fm-calm-pi-extension.test.sh duration_ms=27646
+FM_TEST_SLOWEST rank=5 script=tests/fm-extension-binding.test.sh duration_ms=10278
+FM_TEST_SLOWEST rank=6 script=tests/fm-bearings-board.test.sh duration_ms=6488
+FM_TEST_SLOWEST rank=7 script=tests/fm-bearings-board-render.test.sh duration_ms=2066
