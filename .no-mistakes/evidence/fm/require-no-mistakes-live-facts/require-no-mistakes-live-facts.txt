@@ -1,0 +1,37 @@
+Resolved workflow/action contract:
+{
+  "action": "kunchenguid/no-mistakes/.github/actions/require-no-mistakes@76fa0921a9797b09e120c8b5979c4d0e65f88922",
+  "permissions": {
+    "contents": "read",
+    "pull-requests": "read"
+  },
+  "token_default": "${{ github.token }}",
+  "token_env": "${{ inputs.github-token }}"
+}
+
+CASE 1 - stale event, compliant live PR
+archived event head: 1111111111111111111111111111111111111111
+live API head:       2222222222222222222222222222222222222222
+API request:         ['/repos/kunchenguid/firstmate/pulls/3796']
+exit code:           0
+action outputs:      exempt=false
+compliant=true
+Found no-mistakes signature in PR #3796 body.
+Found structurally compliant pipeline step attestation.
+::warning::PR-body attestation is author-editable and is not cryptographic proof that no-mistakes produced it.
+
+CASE 2 - same event, live lookup denied
+archived event head: 1111111111111111111111111111111111111111
+live API head:       (403 denied)
+API request:         ['/repos/kunchenguid/firstmate/pulls/3796']
+exit code:           1
+action outputs:      exempt=false
+compliant=false
+exempt=false
+::error::Could not verify this PR's live body/head via the GitHub API, so require-no-mistakes cannot safely evaluate compliance: falling back to the workflow's own cached event payload risks certifying a stale, already-superseded verdict if this job was rerun (see verify.py's module docstring).
+
+Add `pull-requests: read` to this workflow's `permissions:` so require-no-mistakes can verify against live PR state, or forward explicit `pr-body`/`pr-head-sha` inputs to bypass the live lookup entirely.
+
+PR author: contributor
+
+RESULT - live PR facts replace stale event facts; denied live lookup fails closed with the required permission named.
