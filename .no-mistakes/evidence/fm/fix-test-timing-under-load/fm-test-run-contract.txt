@@ -1,0 +1,47 @@
+FM_TEST_BEGIN 2026-09-05T16:07:58Z tests/fm-test-run.test.sh family=pure-contract-unit expected_gate_skip=none
+fixture cleanup TERM: pid=313415 ppid=313128 cwd=/tmp/fm-cleanup-users.T39wfl cmdline=bash -c cd "$1"; trap "" TERM; touch cwd.ready; while :; do sleep 1; done _ /tmp/fm-cleanup-users.T39wfl 
+fixture cleanup TERM: pid=313417 ppid=313128 cwd=/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M1RZBGVN8TGF6W7DPD0HF6Q4 cmdline=bash -c exec 9> "$1/open"; trap "" TERM; touch "$1/fd.ready"; while :; do sleep 1; done _ /tmp/fm-cleanup-users.T39wfl 
+fixture cleanup KILL: pid=313415 ppid=313128 cwd=/tmp/fm-cleanup-users.T39wfl cmdline=bash -c cd "$1"; trap "" TERM; touch cwd.ready; while :; do sleep 1; done _ /tmp/fm-cleanup-users.T39wfl 
+/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M1RZBGVN8TGF6W7DPD0HF6Q4/tests/lib.sh: line 133: 313415 Killed                     bash -c 'cd "$1"; trap "" TERM; touch cwd.ready; while :; do sleep 1; done' _ "$fixture"
+fixture cleanup KILL: pid=313417 ppid=313128 cwd=/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M1RZBGVN8TGF6W7DPD0HF6Q4 cmdline=bash -c exec 9> "$1/open"; trap "" TERM; touch "$1/fd.ready"; while :; do sleep 1; done _ /tmp/fm-cleanup-users.T39wfl 
+/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M1RZBGVN8TGF6W7DPD0HF6Q4/tests/lib.sh: line 128: 313417 Killed                     bash -c 'exec 9> "$1/open"; trap "" TERM; touch "$1/fd.ready"; while :; do sleep 1; done' _ "$fixture"
+ok - fixture cleanup finds cwd and open-fd users, escalates to KILL, and preserves other fixtures
+ok - runner validates and propagates bounded fixture timeout scaling
+ok - Herdr leak check preserves Linux and portable baseline identity contracts
+ok - exact suite coverage: --all lists every tests/*.test.sh once
+ok - family selection returns a proper subset of the suite
+ok - single-script selection lists exactly that path
+ok - changed-file selection stays conservative (never silent full suite)
+ok - runner and its documentation surfaces select their curated family, not just their contract owners
+ok - changed selection covers dependents and fails closed for unmapped source
+ok - a bin reference selects the referencing scripts, and consumers still select their curated families
+ok - changed defaults to bounded automatic scheduling with serial override
+ok - a plain script list defaults to bounded automatic concurrency without an automatic timeout
+ok - family proofs run concurrently only within separate family phases
+ok - runner elapsed budgets survive backward wall-clock changes
+ok - empty changed selection emits deterministic text and JSON summaries
+ok - timing markers and JSON artifact are valid
+ok - aggregate exit reflects any script failure
+ok - gate-skip accounting is honest and non-failing
+ok - fail-on-gate-skip converts herdr-not-found into a hard failure
+ok - exclude-family drops the named primary family after selection
+ok - portable shard union, disjointness, and coverage guard hold
+ok - portable serial shards are a deterministic disjoint cover of the serial lane
+ok - coverage guard reports and bounds the unmeasured portable serial share
+ok - portable serial shard lanes refuse mismatched, out-of-range, and countless names
+ok - --jobs refuses non-proven / stateful selections
+ok - --jobs admits and schedules a family with a recorded concurrent proof
+ok - an unclassified new test stays serial while the proven residual family runs concurrently
+ok - a concurrent run starts the longest-hint script first
+ok - --per-script-timeout-secs turns a hung script into a bounded failure
+ok - --max-wall-ms fails an over-budget run and refuses a malformed budget
+ok - jobs scheduler runs proven scripts; failure propagates; non-proven refused
+ok - Herdr CI family-run step times out at 20 min under a 75 min job backstop
+ok - aggregate-json merges lane timing artifacts
+FM_TEST_END 2026-09-05T16:10:28Z tests/fm-test-run.test.sh exit=0 duration_ms=150086 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=150185
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=150086 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-test-run.test.sh duration_ms=150086
+fm-test-run: wrote timing artifact: /home/haro/.local/state/agent-env/no-mistakes/evidence/01M1RZBGVN8TGF6W7DPD0HF6Q4/fm-test-run-contract.json
+fm-test-run: WARNING: pre-existing Herdr server remains after suite: pid=1419332 start=28338255 cwd=/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M1RZBGVN8TGF6W7DPD0HF6Q4 session=fm-remote
+fm-test-run: no new fm-remote or fm-lab-* Herdr server survived the suite
