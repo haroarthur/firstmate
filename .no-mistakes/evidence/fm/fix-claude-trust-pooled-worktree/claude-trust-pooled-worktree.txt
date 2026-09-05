@@ -1,0 +1,16 @@
+=== Claude trust pooled-worktree fix: end-to-end behavioral evidence ===
+
+User intent: a secondmate home's pooled treehouse worktrees share the PARENT
+home's clone common dir, so trust pre-registration wrongly refused them and no
+Claude worker/scout could launch in a secondmate home.
+
+--- BEFORE FIX (bin/fm-claude-trust.sh at base af8c4b6) ---
+not ok - a pooled worktree of the parent's clone must be trusted in a secondmate home: error: refusing to pre-register Claude trust: '/tmp/fm-claude-trust.P2ZG58/parent-pool/treehouse/analytics-abc123/1' is not a worktree of project '/tmp/fm-claude-trust.P2ZG58/parent-pool/sub-home/projects/analytics': expected exit 0, got 1
+
+--- AFTER FIX (target 381ccfd) ---
+ok - fm-claude-trust.sh: trusts a secondmate pool worktree of the parent's clone
+ok - fm-claude-trust.sh: refuses an unrelated pool worktree even with a parent binding
+
+The pooled-worktree acceptance test fails before the fix with the exact
+'is not a worktree of project' refusal from the report, and passes after;
+the unrelated-worktree test confirms the widened owner stays fail-closed.
