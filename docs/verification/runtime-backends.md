@@ -301,7 +301,7 @@ That gate is not a production blocker, because a normal environment has already 
 This change does not address that warning and does not claim to.
 
 `bin/fm-spawn.sh` therefore pre-registers the task worktree through `bin/fm-claude-trust.sh` before launch, and `tests/fm-claude-trust.test.sh` pins both halves of the scope contract: a fresh worktree is trusted, and an out-of-scope path is refused.
-The scope test also accepts one narrow structural case so a claude crewmate can spawn in a secondmate home: a shared Treehouse pool worktree of the ROOT home's clone, when the passed project is one of the launching home's own registered projects, while still refusing an unregistered project or an unrelated repo's worktree.
+The scope test also accepts one narrow structural case so a claude crewmate can spawn in a secondmate home: a genuine shared Treehouse pool slot of the same-origin ROOT-home clone, when the passed project is one of the launching home's own registered project clones, while still refusing an unregistered project, a different-origin same-name repository, an unrelated repository's worktree, or a root-clone worktree outside the pool.
 That automated spawn case runs against a fake claude, so it asserts the store entry and the launch command and nothing more; the live arms above are what establish that the entry actually suppresses the dialog.
 The composer-classification record below observes the same gate from the other side, where an untrusted worktree left Claude, Grok, and Muse unverified because the guard reads a first-launch trust dialog as an unreadable composer.
 

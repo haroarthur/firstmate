@@ -47,7 +47,8 @@ make_secondmate_case() {  # <name> [registered=1] [same-origin=1]
   home="$case_dir/subhome"
   SM_NAME=proj
   SM_CONFIG="$case_dir/claude-config"
-  mkdir -p "$SM_CONFIG" "$root/projects" "$root/data" "$home/projects" "$home/data"
+  mkdir -p "$SM_CONFIG" "$root/projects" "$root/data" "$root/state" \
+    "$home/projects" "$home/data"
   seed="$case_dir/root-seed"
   origin="$case_dir/root-origin.git"
   fm_git_init_commit "$seed"
@@ -533,6 +534,32 @@ test_root_clone_worktree_outside_pool_is_refused() {
   pass "fm-claude-trust.sh: refuses a root-clone worktree outside the shared pool"
 }
 
+# Drive the actual spawn entry point through the widened topology.
+# This proves fm-spawn forwards the launching secondmate home to the trust
+# registrar before it sends Claude the brief, rather than proving only the
+# registrar in isolation.
+test_secondmate_claude_spawn_pretrusts_its_pool_worktree() {
+  local fakebin launch_log out id
+  id=smtrustspawn
+  make_secondmate_case sm-spawn
+  launch_log="$TMP_ROOT/sm-spawn/launch.log"
+  fakebin=$(make_spawn_fakebin "$TMP_ROOT/sm-spawn/fake" claude)
+  fm_test_spawn_home "$SM_HOME" claude
+  fm_test_spawn_brief "$SM_HOME" "$id"
+  out=$(FM_TEST_CLAUDE_CONFIG_DIR="$SM_CONFIG" FM_FAKE_LAUNCH_LOG="$launch_log" \
+    fm_test_run_spawn "$SM_HOME" "$SM_WT" "$fakebin" "$id" "$SM_PROJ" claude \
+    --mode no-mistakes --yolo off)
+  expect_code 0 $? "a Claude spawn from a secondmate home must accept its shared-pool worktree: $out"
+  assert_trusted "$SM_CONFIG/.claude.json" "$SM_WT" \
+    "the secondmate spawn did not pre-register its shared-pool worktree"
+  assert_present "$launch_log" "the secondmate spawn sent no Claude launch command"
+  assert_grep "$SM_HOME/data/$id/launch-brief.md" "$launch_log" \
+    "the secondmate spawn did not send the brief after trust registration"
+  assert_grep "CLAUDE_CONFIG_DIR='$SM_CONFIG'" "$launch_log" \
+    "the secondmate worker did not read the store containing its pool-worktree trust"
+  pass "fm-spawn.sh: a secondmate Claude spawn pre-trusts its shared-pool worktree and sends the brief"
+}
+
 # The spawn half: a real fm-spawn of a claude worker must pre-register the
 # worktree AND deliver the launch command carrying the brief, with no dialog to
 # answer and no human in the loop.
@@ -583,6 +610,7 @@ test_secondmate_pool_worktree_for_unregistered_project_is_refused
 test_unrelated_repo_worktree_with_home_is_refused
 test_same_name_project_from_different_origin_is_refused
 test_root_clone_worktree_outside_pool_is_refused
+test_secondmate_claude_spawn_pretrusts_its_pool_worktree
 test_worktree_subdirectory_is_refused
 test_unrelated_store_content_is_preserved
 test_symlinked_store_to_a_foreign_owned_target_is_refused
