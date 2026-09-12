@@ -1,0 +1,17 @@
+ok - fm-claude-trust.sh: a fresh task worktree is trusted
+ok - fm-claude-trust.sh: repeat registration is idempotent
+ok - fm-claude-trust.sh: refuses the primary checkout
+ok - fm-claude-trust.sh: an exported CDPATH cannot defeat the scope refusal
+ok - fm-claude-trust.sh: inherited git environment overrides cannot defeat the scope refusal
+ok - fm-claude-trust.sh: refuses a home directory the git checks would accept
+ok - fm-claude-trust.sh: refuses the Claude config directory
+ok - fm-claude-trust.sh: refuses a relative CLAUDE_CONFIG_DIR
+ok - fm-claude-trust.sh: refuses a directory that is not a git worktree
+ok - fm-claude-trust.sh: refuses a path that does not exist
+ok - fm-claude-trust.sh: refuses a worktree belonging to another project
+ok - fm-claude-trust.sh: trusts a secondmate's shared-pool worktree of a registered project
+ok - fm-claude-trust.sh: refuses a pool worktree for a project the home has not registered
+ok - fm-claude-trust.sh: refuses an unrelated repo's worktree even with a valid home and registered project
+ok - fm-claude-trust.sh: refuses a same-named pool worktree from a different origin
+ok - fm-claude-trust.sh: refuses a root-clone worktree outside the shared pool
+not ok - a Claude spawn from a secondmate home must accept its shared-pool worktree: error: could not resolve the shared Treehouse project lock for /tmp/fm-claude-trust.OjBIQp/sm-spawn/subhome/projects/proj: expected exit 0, got 1
