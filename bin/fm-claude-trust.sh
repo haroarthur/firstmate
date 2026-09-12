@@ -119,6 +119,25 @@ common_dir_of() {
   (cd -P -- "$dir" && real_dir "$common")
 }
 
+repository_identity() {  # <project-dir>
+  local project=$1 origin top
+  origin=$(git -C "$project" remote get-url origin 2>/dev/null || true)
+  if [ -n "$origin" ]; then
+    case "$origin" in
+      /*) origin=$(real_dir "$origin") || return 1 ;;
+      *://* | *:*) ;;
+      *) origin=$(cd -P -- "$project" && real_dir "$origin") || return 1 ;;
+    esac
+    [ -n "$origin" ] || return 1
+    printf '%s\n' "$origin"
+    return 0
+  fi
+  top=$(git -C "$project" rev-parse --show-toplevel 2>/dev/null) || return 1
+  top=$(real_dir "$top") || return 1
+  [ -n "$top" ] || return 1
+  printf '%s\n' "$top"
+}
+
 # Whether the registry file lists a project by exactly this name. A membership
 # test only: the delivery-posture contract this registry also carries is owned by
 # bin/fm-project-mode.sh and is not consulted here.
@@ -148,7 +167,7 @@ resolve_root_home() {  # <home>
 # ROOT home's clone of that SAME project. Any missing link fails closed.
 home_owns_pool_worktree() {  # <home> <project-real> <worktree-common>
   local home=$1 proj_real=$2 wt_common=$3
-  local home_real proj_parent name root root_common
+  local home_real proj_parent name root root_project root_common proj_identity root_identity
   [ -n "$home" ] || return 1
   home_real=$(real_dir "$home") || return 1
   [ -n "$home_real" ] || return 1
@@ -160,8 +179,12 @@ home_owns_pool_worktree() {  # <home> <project-real> <worktree-common>
   name=$(basename -- "$proj_real")
   registry_lists_project "$home_real/data/projects.md" "$name" || return 1
   root=$(resolve_root_home "$home_real") || return 1
-  [ -d "$root/projects/$name" ] || return 1
-  root_common=$(common_dir_of "$root/projects/$name") || return 1
+  root_project="$root/projects/$name"
+  [ -d "$root_project" ] || return 1
+  proj_identity=$(repository_identity "$proj_real") || return 1
+  root_identity=$(repository_identity "$root_project") || return 1
+  [ -n "$proj_identity" ] && [ "$proj_identity" = "$root_identity" ] || return 1
+  root_common=$(common_dir_of "$root_project") || return 1
   [ -n "$root_common" ] || return 1
   [ "$root_common" = "$wt_common" ]
 }

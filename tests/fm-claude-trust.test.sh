@@ -34,25 +34,39 @@ EOF
 }
 
 # make_secondmate_case <name> [registered]: build the secondmate shared-pool
-# topology and set SM_* globals. A ROOT firstmate home clones project "proj"; a
-# secondmate home below it (via a local .fm-secondmate-parent marker) has its OWN
-# separate clone of "proj"; and SM_WT is a linked worktree of the ROOT clone,
-# exactly as a Treehouse pool slot is. When <registered> is 0 the secondmate's
-# data/projects.md omits the project so the ownership check must refuse it.
-make_secondmate_case() {  # <name> [registered=1]
-  local name=$1 registered=${2:-1} case_dir root home
+# topology and set SM_* globals. A ROOT firstmate home and a secondmate home
+# below it each clone project "proj" from the same origin; SM_WT is a linked
+# worktree of the ROOT clone, exactly as a Treehouse pool slot is. When
+# <registered> is 0 the secondmate's data/projects.md omits the project. When
+# <same-origin> is 0 the secondmate clone has an unrelated origin with the same
+# project basename, so repository identity must refuse it.
+make_secondmate_case() {  # <name> [registered=1] [same-origin=1]
+  local name=$1 registered=${2:-1} same_origin=${3:-1} case_dir root home seed origin
   case_dir="$TMP_ROOT/$name"
   root="$case_dir/root"
   home="$case_dir/subhome"
   SM_NAME=proj
   SM_CONFIG="$case_dir/claude-config"
   mkdir -p "$SM_CONFIG" "$root/projects" "$root/data" "$home/projects" "$home/data"
+  seed="$case_dir/root-seed"
+  origin="$case_dir/root-origin.git"
+  fm_git_init_commit "$seed"
+  git clone --quiet --bare "$seed" "$origin"
+  git clone --quiet "$origin" "$root/projects/$SM_NAME"
   # The ROOT clone plus its shared-pool worktree.
-  fm_git_worktree "$root/projects/$SM_NAME" "$case_dir/pool-slot" "wt-$name"
+  git -C "$root/projects/$SM_NAME" worktree add --quiet -b "wt-$name" "$case_dir/pool-slot"
   SM_WT="$case_dir/pool-slot"
   printf -- '- %s - root project (added 2026-01-01)\n' "$SM_NAME" > "$root/data/projects.md"
-  # The secondmate's OWN separate clone of the same-named project.
-  fm_git_init_commit "$home/projects/$SM_NAME"
+  # The secondmate's OWN separate clone of the same project origin.
+  if [ "$same_origin" = 1 ]; then
+    git clone --quiet "$origin" "$home/projects/$SM_NAME"
+  else
+    seed="$case_dir/unrelated-seed"
+    origin="$case_dir/unrelated-origin.git"
+    fm_git_init_commit "$seed"
+    git clone --quiet --bare "$seed" "$origin"
+    git clone --quiet "$origin" "$home/projects/$SM_NAME"
+  fi
   SM_PROJ="$home/projects/$SM_NAME"
   # The durable local parent binding fm_firstmate_root_home walks to the root.
   cat > "$home/.fm-secondmate-parent" <<EOF
@@ -492,6 +506,16 @@ test_unrelated_repo_worktree_with_home_is_refused() {
   pass "fm-claude-trust.sh: refuses an unrelated repo's worktree even with a valid home and registered project"
 }
 
+test_same_name_project_from_different_origin_is_refused() {
+  local out
+  make_secondmate_case sm-same-name-different-origin 1 0
+  out=$(run_trust "$SM_CONFIG" "$SM_WT" "$SM_PROJ" "$SM_CONFIG" "$SM_HOME")
+  expect_code 1 $? "a same-named project from a different origin must be refused: $out"
+  assert_contains "$out" "is not a worktree of project" "the refusal did not name the project mismatch"
+  assert_not_trusted "$SM_CONFIG/.claude.json" "$SM_WT" "a different-origin pool worktree was trusted by basename"
+  pass "fm-claude-trust.sh: refuses a same-named pool worktree from a different origin"
+}
+
 # The spawn half: a real fm-spawn of a claude worker must pre-register the
 # worktree AND deliver the launch command carrying the brief, with no dialog to
 # answer and no human in the loop.
@@ -540,6 +564,7 @@ test_foreign_project_worktree_is_refused
 test_secondmate_pool_worktree_is_trusted
 test_secondmate_pool_worktree_for_unregistered_project_is_refused
 test_unrelated_repo_worktree_with_home_is_refused
+test_same_name_project_from_different_origin_is_refused
 test_worktree_subdirectory_is_refused
 test_unrelated_store_content_is_preserved
 test_symlinked_store_to_a_foreign_owned_target_is_refused
