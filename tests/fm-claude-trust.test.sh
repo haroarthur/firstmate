@@ -41,7 +41,7 @@ EOF
 # <same-origin> is 0 the secondmate clone has an unrelated origin with the same
 # project basename, so repository identity must refuse it.
 make_secondmate_case() {  # <name> [registered=1] [same-origin=1]
-  local name=$1 registered=${2:-1} same_origin=${3:-1} case_dir root home seed origin
+  local name=$1 registered=${2:-1} same_origin=${3:-1} case_dir root home seed origin pool
   case_dir="$TMP_ROOT/$name"
   root="$case_dir/root"
   home="$case_dir/subhome"
@@ -54,8 +54,12 @@ make_secondmate_case() {  # <name> [registered=1] [same-origin=1]
   git clone --quiet --bare "$seed" "$origin"
   git clone --quiet "$origin" "$root/projects/$SM_NAME"
   # The ROOT clone plus its shared-pool worktree.
-  git -C "$root/projects/$SM_NAME" worktree add --quiet -b "wt-$name" "$case_dir/pool-slot"
-  SM_WT="$case_dir/pool-slot"
+  pool="$case_dir/pool"
+  SM_WT="$pool/slot/$SM_NAME"
+  mkdir -p "$pool/slot"
+  printf '%s\n' '{}' > "$pool/treehouse-state.json"
+  git -C "$root/projects/$SM_NAME" worktree add --quiet -b "wt-$name" "$SM_WT"
+  SM_ROOT_PROJ="$root/projects/$SM_NAME"
   printf -- '- %s - root project (added 2026-01-01)\n' "$SM_NAME" > "$root/data/projects.md"
   # The secondmate's OWN separate clone of the same project origin.
   if [ "$same_origin" = 1 ]; then
@@ -516,6 +520,19 @@ test_same_name_project_from_different_origin_is_refused() {
   pass "fm-claude-trust.sh: refuses a same-named pool worktree from a different origin"
 }
 
+test_root_clone_worktree_outside_pool_is_refused() {
+  local out unmanaged
+  make_secondmate_case sm-outside-pool
+  unmanaged="$TMP_ROOT/sm-outside-pool/unmanaged/slot/$SM_NAME"
+  mkdir -p "$(dirname -- "$unmanaged")"
+  git -C "$SM_ROOT_PROJ" worktree add --quiet -b wt-sm-outside-pool-unmanaged "$unmanaged"
+  out=$(run_trust "$SM_CONFIG" "$unmanaged" "$SM_PROJ" "$SM_CONFIG" "$SM_HOME")
+  expect_code 1 $? "a root-clone worktree outside the shared pool must be refused: $out"
+  assert_contains "$out" "is not a worktree of project" "the refusal did not name the project mismatch"
+  assert_not_trusted "$SM_CONFIG/.claude.json" "$unmanaged" "an unmanaged root-clone worktree was trusted"
+  pass "fm-claude-trust.sh: refuses a root-clone worktree outside the shared pool"
+}
+
 # The spawn half: a real fm-spawn of a claude worker must pre-register the
 # worktree AND deliver the launch command carrying the brief, with no dialog to
 # answer and no human in the loop.
@@ -565,6 +582,7 @@ test_secondmate_pool_worktree_is_trusted
 test_secondmate_pool_worktree_for_unregistered_project_is_refused
 test_unrelated_repo_worktree_with_home_is_refused
 test_same_name_project_from_different_origin_is_refused
+test_root_clone_worktree_outside_pool_is_refused
 test_worktree_subdirectory_is_refused
 test_unrelated_store_content_is_preserved
 test_symlinked_store_to_a_foreign_owned_target_is_refused

@@ -161,12 +161,19 @@ resolve_root_home() {  # <home>
   printf '%s\n' "$root"
 }
 
+is_treehouse_pool_slot() {  # <home> <project> <worktree>
+  local home=$1 project=$2 worktree=$3
+  # shellcheck source=bin/fm-wake-lib.sh
+  ( set +u; FM_HOME="$home" . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1 \
+    && fm_treehouse_pool_slot "$project" "$worktree" 2>/dev/null )
+}
+
 # The secondmate shared-pool acceptance documented in THE SCOPE TEST. Returns 0
 # only when <project> is one of <home>'s OWN registered project clones and
-# <worktree> (via its already-resolved common dir) is a linked worktree of the
-# ROOT home's clone of that SAME project. Any missing link fails closed.
-home_owns_pool_worktree() {  # <home> <project-real> <worktree-common>
-  local home=$1 proj_real=$2 wt_common=$3
+# <worktree> is a genuine Treehouse pool slot linked to the ROOT home's clone of
+# that SAME project. Any missing link fails closed.
+home_owns_pool_worktree() {  # <home> <project-real> <worktree-real> <worktree-common>
+  local home=$1 proj_real=$2 wt_real=$3 wt_common=$4
   local home_real proj_parent name root root_project root_common proj_identity root_identity
   [ -n "$home" ] || return 1
   home_real=$(real_dir "$home") || return 1
@@ -186,7 +193,8 @@ home_owns_pool_worktree() {  # <home> <project-real> <worktree-common>
   [ -n "$proj_identity" ] && [ "$proj_identity" = "$root_identity" ] || return 1
   root_common=$(common_dir_of "$root_project") || return 1
   [ -n "$root_common" ] || return 1
-  [ "$root_common" = "$wt_common" ]
+  [ "$root_common" = "$wt_common" ] || return 1
+  is_treehouse_pool_slot "$home_real" "$root_project" "$wt_real"
 }
 
 WT_REAL=$(real_dir "$WT_ARG") || true
@@ -242,7 +250,7 @@ PROJ_COMMON=$(common_dir_of "$PROJ_REAL") || true
 # own registered project - to the ROOT home's clone of that same project, which
 # is where a secondmate's shared-pool slots live. Any other worktree is refused.
 if [ "$WT_COMMON" != "$PROJ_COMMON" ] \
-  && ! home_owns_pool_worktree "$HOME_ARG" "$PROJ_REAL" "$WT_COMMON"; then
+  && ! home_owns_pool_worktree "$HOME_ARG" "$PROJ_REAL" "$WT_REAL" "$WT_COMMON"; then
   refuse "'$WT_REAL' is not a worktree of project '$PROJ_REAL'"
 fi
 
