@@ -3231,7 +3231,7 @@ fi
 if [ "$KIND" != secondmate ]; then
   case "$HARNESS" in
     claude*)
-      if ! "$FM_ROOT/bin/fm-claude-trust.sh" "$WT" "$PROJ_ABS" >/dev/null; then
+      if ! "$FM_ROOT/bin/fm-claude-trust.sh" "$WT" "$PROJ_ABS" "$FM_HOME" >/dev/null; then
         echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog; inspect window $T" >&2
         exit 1
       fi

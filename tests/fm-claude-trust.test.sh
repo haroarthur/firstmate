@@ -33,10 +33,52 @@ $1
 EOF
 }
 
-# run_trust <config> <worktree> <project> [home]: invoke with an isolated store.
+# make_secondmate_case <name> [registered]: build the secondmate shared-pool
+# topology and set SM_* globals. A ROOT firstmate home clones project "proj"; a
+# secondmate home below it (via a local .fm-secondmate-parent marker) has its OWN
+# separate clone of "proj"; and SM_WT is a linked worktree of the ROOT clone,
+# exactly as a Treehouse pool slot is. When <registered> is 0 the secondmate's
+# data/projects.md omits the project so the ownership check must refuse it.
+make_secondmate_case() {  # <name> [registered=1]
+  local name=$1 registered=${2:-1} case_dir root home
+  case_dir="$TMP_ROOT/$name"
+  root="$case_dir/root"
+  home="$case_dir/subhome"
+  SM_NAME=proj
+  SM_CONFIG="$case_dir/claude-config"
+  mkdir -p "$SM_CONFIG" "$root/projects" "$root/data" "$home/projects" "$home/data"
+  # The ROOT clone plus its shared-pool worktree.
+  fm_git_worktree "$root/projects/$SM_NAME" "$case_dir/pool-slot" "wt-$name"
+  SM_WT="$case_dir/pool-slot"
+  printf -- '- %s - root project (added 2026-01-01)\n' "$SM_NAME" > "$root/data/projects.md"
+  # The secondmate's OWN separate clone of the same-named project.
+  fm_git_init_commit "$home/projects/$SM_NAME"
+  SM_PROJ="$home/projects/$SM_NAME"
+  # The durable local parent binding fm_firstmate_root_home walks to the root.
+  cat > "$home/.fm-secondmate-parent" <<EOF
+schema=fm-secondmate-parent.v1
+route=local
+parent_home=$(cd "$root" && pwd -P)
+EOF
+  if [ "$registered" = 1 ]; then
+    printf -- '- %s [no-mistakes] - secondmate project (added 2026-01-01)\n' "$SM_NAME" \
+      > "$home/data/projects.md"
+  else
+    printf -- '- other - an unrelated project (added 2026-01-01)\n' > "$home/data/projects.md"
+  fi
+  SM_HOME="$home"
+}
+
+# run_trust <config> <worktree> <project> [home] [fmhome]: invoke with an
+# isolated store. <home> sets HOME for the run (the config dir by default), and
+# <fmhome>, when given, is passed as the launching firstmate home argument.
 run_trust() {
-  local config=$1 wt=$2 proj=$3 home=${4:-$1}
-  CLAUDE_CONFIG_DIR="$config" HOME="$home" "$TRUST" "$wt" "$proj" 2>&1
+  local config=$1 wt=$2 proj=$3 home=${4:-$1} fmhome=${5:-}
+  if [ -n "$fmhome" ]; then
+    CLAUDE_CONFIG_DIR="$config" HOME="$home" "$TRUST" "$wt" "$proj" "$fmhome" 2>&1
+  else
+    CLAUDE_CONFIG_DIR="$config" HOME="$home" "$TRUST" "$wt" "$proj" 2>&1
+  fi
 }
 
 trusted_paths() {  # <store>
@@ -406,6 +448,50 @@ test_refused_spawn_leaves_no_task_state() {
   pass "fm-spawn.sh: a trust-refused claude spawn leaves no task state behind"
 }
 
+# A secondmate's crewmate worktree comes from the shared Treehouse pool, whose
+# slots are linked worktrees of the ROOT home's clone while the project passed is
+# the secondmate's OWN clone. The common dirs differ, yet this is a legitimate
+# worktree of one of the home's registered projects and must be trusted so a
+# claude crewmate can spawn in a secondmate home at all.
+test_secondmate_pool_worktree_is_trusted() {
+  local out
+  make_secondmate_case sm-accept
+  out=$(run_trust "$SM_CONFIG" "$SM_WT" "$SM_PROJ" "$SM_CONFIG" "$SM_HOME")
+  expect_code 0 $? "a secondmate's shared-pool worktree of a registered project must be trusted: $out"
+  assert_contains "$out" "trusted:" "the secondmate pool worktree registration reported nothing"
+  assert_trusted "$SM_CONFIG/.claude.json" "$SM_WT" "the secondmate pool worktree was not recorded as trusted"
+  pass "fm-claude-trust.sh: trusts a secondmate's shared-pool worktree of a registered project"
+}
+
+# The relaxation is scoped to the home's OWN registered projects. The exact same
+# worktree, home, and project clone are refused when the project is not listed in
+# the launching home's registry, so the widening cannot become blanket.
+test_secondmate_pool_worktree_for_unregistered_project_is_refused() {
+  local out
+  make_secondmate_case sm-unregistered 0
+  out=$(run_trust "$SM_CONFIG" "$SM_WT" "$SM_PROJ" "$SM_CONFIG" "$SM_HOME")
+  expect_code 1 $? "an unregistered project's pool worktree must be refused: $out"
+  assert_contains "$out" "is not a worktree of project" "the refusal did not name the project mismatch"
+  assert_not_trusted "$SM_CONFIG/.claude.json" "$SM_WT" "an unregistered project's pool worktree was trusted"
+  pass "fm-claude-trust.sh: refuses a pool worktree for a project the home has not registered"
+}
+
+# The launching home does not widen the boundary to any repo. A worktree of an
+# unrelated repo is still refused even when a valid home and a registered project
+# clone are passed, because its common dir is not the ROOT clone's.
+test_unrelated_repo_worktree_with_home_is_refused() {
+  local out other other_wt
+  make_secondmate_case sm-unrelated
+  other="$TMP_ROOT/sm-unrelated/other-project"
+  other_wt="$TMP_ROOT/sm-unrelated/other-wt"
+  fm_git_worktree "$other" "$other_wt" wt-other
+  out=$(run_trust "$SM_CONFIG" "$other_wt" "$SM_PROJ" "$SM_CONFIG" "$SM_HOME")
+  expect_code 1 $? "an unrelated repo's worktree must be refused even with a valid home: $out"
+  assert_contains "$out" "is not a worktree of project" "the refusal did not name the project mismatch"
+  assert_not_trusted "$SM_CONFIG/.claude.json" "$other_wt" "an unrelated repo's worktree was trusted via the home path"
+  pass "fm-claude-trust.sh: refuses an unrelated repo's worktree even with a valid home and registered project"
+}
+
 # The spawn half: a real fm-spawn of a claude worker must pre-register the
 # worktree AND deliver the launch command carrying the brief, with no dialog to
 # answer and no human in the loop.
@@ -451,6 +537,9 @@ test_relative_config_dir_is_refused
 test_non_git_directory_is_refused
 test_missing_directory_is_refused
 test_foreign_project_worktree_is_refused
+test_secondmate_pool_worktree_is_trusted
+test_secondmate_pool_worktree_for_unregistered_project_is_refused
+test_unrelated_repo_worktree_with_home_is_refused
 test_worktree_subdirectory_is_refused
 test_unrelated_store_content_is_preserved
 test_symlinked_store_to_a_foreign_owned_target_is_refused

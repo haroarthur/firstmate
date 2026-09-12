@@ -3,9 +3,13 @@
 # ship/scout spawn is about to launch a claude crewmate into, so the worker
 # reaches its brief instead of wedging on the trust dialog.
 #
-# Usage: fm-claude-trust.sh <worktree> <project>
+# Usage: fm-claude-trust.sh <worktree> <project> [<home>]
 #   <worktree>  the isolated task worktree this spawn launches into
-#   <project>   the primary checkout that worktree belongs to
+#   <project>   the project clone that worktree belongs to
+#   <home>      the launching firstmate home (FM_HOME). Optional, and consulted
+#               only to accept a secondmate's shared-pool worktree, see the
+#               SECONDMATE case in THE SCOPE TEST below. Absent it, only a
+#               worktree of <project> itself is accepted.
 # Prints one line naming what it registered; refuses loudly on anything else.
 #
 # WHY THIS EXISTS. Claude Code gates a folder it has never seen behind an
@@ -33,7 +37,26 @@
 # in-project pool), so a prefix check would refuse legitimate roots, accept
 # whatever a mutable env var names, and add exactly the policy surface this
 # registration must not grow. The structural test is verified for treehouse
-# worktrees, which are linked git worktrees. Orca's worktree shape is UNVERIFIED:
+# worktrees, which are linked git worktrees.
+#
+# THE SECONDMATE case is the one deliberate widening of the equality above, and
+# it stays structural. A secondmate home clones each of its OWN registered
+# projects, but its crewmate worktrees come from the shared Treehouse pool, whose
+# slots are linked worktrees of the ROOT firstmate home's clone of the same
+# project - not of the secondmate's clone. So <worktree>'s git common dir is the
+# ROOT clone's while <project> is the secondmate's clone, and the equality can
+# never hold there even though the worktree is entirely legitimate. This accepts
+# exactly that shape and nothing wider: <home> must be given, <project> must be
+# one of that home's OWN registered project clones (home/projects/<name> with
+# <name> listed in home/data/projects.md), and <worktree> must be a linked
+# worktree of the ROOT home's clone of that SAME project (the root home resolved
+# through the owned fm_firstmate_root_home). A worktree of any other repo has a
+# different common dir and is still refused; an unregistered project is refused
+# before the root clone is ever consulted; and when <home> is absent or any link
+# in that chain cannot be established, the ordinary same-project refusal stands.
+# This never trusts a directory that is not a firstmate-managed linked worktree.
+#
+# The test is deliberately NOT a treehouse or orca path prefix. Treehouse's
 # docs/orca-backend.md calls it an "independent worktree", which does not
 # establish a shared git common dir, and orca is macOS-only and was not installed
 # where this was written. If Orca clones instead of linking, its git dir equals
@@ -69,9 +92,15 @@ unset CDPATH \
   GIT_DISCOVERY_ACROSS_FILESYSTEM GIT_CONFIG GIT_CONFIG_GLOBAL \
   GIT_CONFIG_SYSTEM GIT_CONFIG_NOSYSTEM GIT_CONFIG_COUNT
 
-[ "$#" -eq 2 ] || { echo "usage: fm-claude-trust.sh <worktree> <project>" >&2; exit 2; }
+SCRIPT_DIR=$(cd -P -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+
+case "$#" in
+  2 | 3) ;;
+  *) echo "usage: fm-claude-trust.sh <worktree> <project> [<home>]" >&2; exit 2 ;;
+esac
 WT_ARG=$1
 PROJ_ARG=$2
+HOME_ARG=${3:-}
 
 refuse() { echo "error: refusing to pre-register Claude trust: $1" >&2; exit 1; }
 
@@ -88,6 +117,53 @@ common_dir_of() {
   local dir=$1 common
   common=$(git -C "$dir" rev-parse --git-common-dir 2>/dev/null) || return 1
   (cd -P -- "$dir" && real_dir "$common")
+}
+
+# Whether the registry file lists a project by exactly this name. A membership
+# test only: the delivery-posture contract this registry also carries is owned by
+# bin/fm-project-mode.sh and is not consulted here.
+registry_lists_project() {  # <registry-file> <name>
+  local reg=$1 name=$2
+  [ -f "$reg" ] || return 1
+  awk -v n="$name" '$1=="-" && $2==n { found=1; exit } END { exit(found ? 0 : 1) }' "$reg"
+}
+
+# The launching home's ROOT firstmate home, resolved through the one owner of
+# that traversal (fm_firstmate_root_home in bin/fm-wake-lib.sh). Sourced in a
+# subshell so the library's globals and mkdir never touch this security script's
+# own environment, which the unset block above keeps clean; set +u there because
+# the library predates this script's set -u.
+resolve_root_home() {  # <home>
+  local home=$1 root
+  # shellcheck source=bin/fm-wake-lib.sh
+  root=$( set +u; FM_HOME="$home" . "$SCRIPT_DIR/fm-wake-lib.sh" >/dev/null 2>&1 \
+          && fm_firstmate_root_home "$home" 2>/dev/null ) || return 1
+  [ -n "$root" ] || return 1
+  printf '%s\n' "$root"
+}
+
+# The secondmate shared-pool acceptance documented in THE SCOPE TEST. Returns 0
+# only when <project> is one of <home>'s OWN registered project clones and
+# <worktree> (via its already-resolved common dir) is a linked worktree of the
+# ROOT home's clone of that SAME project. Any missing link fails closed.
+home_owns_pool_worktree() {  # <home> <project-real> <worktree-common>
+  local home=$1 proj_real=$2 wt_common=$3
+  local home_real proj_parent name root root_common
+  [ -n "$home" ] || return 1
+  home_real=$(real_dir "$home") || return 1
+  [ -n "$home_real" ] || return 1
+  # <project> must be home/projects/<name>, resolved so a symlinked projects dir
+  # is still judged against the real launching home.
+  proj_parent=$(dirname -- "$proj_real")
+  [ "$(basename -- "$proj_parent")" = projects ] || return 1
+  [ "$(real_dir "$proj_parent")" = "$(real_dir "$home_real/projects")" ] || return 1
+  name=$(basename -- "$proj_real")
+  registry_lists_project "$home_real/data/projects.md" "$name" || return 1
+  root=$(resolve_root_home "$home_real") || return 1
+  [ -d "$root/projects/$name" ] || return 1
+  root_common=$(common_dir_of "$root/projects/$name") || return 1
+  [ -n "$root_common" ] || return 1
+  [ "$root_common" = "$wt_common" ]
 }
 
 WT_REAL=$(real_dir "$WT_ARG") || true
@@ -139,7 +215,13 @@ WT_COMMON=$(common_dir_of "$WT_REAL") || true
 
 PROJ_COMMON=$(common_dir_of "$PROJ_REAL") || true
 [ -n "$PROJ_COMMON" ] || refuse "project '$PROJ_REAL' is not inside a git repository"
-[ "$WT_COMMON" = "$PROJ_COMMON" ] || refuse "'$WT_REAL' is not a worktree of project '$PROJ_REAL'"
+# The worktree must belong to <project> itself, or - only for a launching home's
+# own registered project - to the ROOT home's clone of that same project, which
+# is where a secondmate's shared-pool slots live. Any other worktree is refused.
+if [ "$WT_COMMON" != "$PROJ_COMMON" ] \
+  && ! home_owns_pool_worktree "$HOME_ARG" "$PROJ_REAL" "$WT_COMMON"; then
+  refuse "'$WT_REAL' is not a worktree of project '$PROJ_REAL'"
+fi
 
 # The store write needs node, and a missing interpreter refuses like every other
 # failure here. Degrading instead would launch a worker straight into the dialog
