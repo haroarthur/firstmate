@@ -1,0 +1,1 @@
+grok --always-approve --model grok-4.6 --reasoning-effort low "$('/home/haro/.local/state/agent-env/no-mistakes/worktrees/016da3fd4704/01M2KF50AEHFJRK6XM85B58S9A/bin/fm-operational-input.sh' encode launch-brief < '/tmp/fm-grok-herdr.gSe0OV/brief.md')"

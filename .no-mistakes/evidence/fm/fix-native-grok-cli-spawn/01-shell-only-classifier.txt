@@ -1,0 +1,3 @@
+process_state=shell
+pane_agent_state=no-agent
+agent_state=dead

@@ -1,0 +1,9 @@
+process_state=agent
+pane_agent_state=live
+agent_state=alive
+alive_hits=6
+agent_not_found_with_agent=0
+registered_grok=7
+baseline_process=shell
+baseline_pane=no-agent
+baseline_agent=dead

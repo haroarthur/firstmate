@@ -1,0 +1,1 @@
+{"id":"cli:pane:process_info","result":{"process_info":{"foreground_process_group_id":3540250,"foreground_processes":[{"argv":["/bin/bash"],"cmdline":"/bin/bash","cwd":"/tmp/fm-grok-herdr.gSe0OV/proj","name":"bash","pid":3540250}],"pane_id":"w1:p1","shell_pid":3540250},"type":"pane_process_info"}}

@@ -1,0 +1,46 @@
+
+
+     Switched to Grok 4.6 (low effort)                                                                                █
+
+
+                                                                                                                      █
+                                                                                                                      █
+
+   master /tmp/fm-grok-herdr.gSe0OV/proj                                                                  18K / 500K
+
+
+     ❯ FIRSTMATE_OP: v1 launch-brief: Do not use tools. Do not modify files. Reply with exactly READY and   6:36 PM   █
+       then wait at the composer.                                                                                     █
+                                                                                                                      █
+                                                                                                                      █
+     ◆ Thought for 0.0s                                                                                               █
+                                                                                                                      █
+     READY                                                                                                  6:36 PM   █
+                                                                                                                      █
+     Worked for 2.3s                                                                                                  █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+
+  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ ❯                                                                                                               │
+  ╰─────────────────────────────────────────────────────────────────────────────── Grok 4.6 (low) · always-approve ─╯
+
+  Shift+Tab:mode  │  Ctrl+x:shortcuts

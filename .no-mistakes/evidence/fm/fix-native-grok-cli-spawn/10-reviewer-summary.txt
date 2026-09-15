@@ -1,0 +1,49 @@
+Native grok 1.0.24 spawn-shaped launch in isolated Herdr lab
+session: fm-lab-grokspawn-3539931-13790 (torn down; default session unchanged)
+
+Baseline empty pane: process_state=shell pane_agent_state=no-agent agent_state=dead
+After typed launch:  process_state=agent pane_agent_state=live agent_state=alive
+Herdr agent get:     agent=grok agent_status=idle
+Foreground:          bwrap wrapping /nix/store/.../grok-1.0.24/bin/grok --always-approve --model grok-4.6 --reasoning-effort low <encode launch-brief>
+
+Pane capture (trimmed):
+
+
+     Switched to Grok 4.6 (low effort)                                                                                █
+
+
+                                                                                                                      █
+                                                                                                                      █
+
+   master /tmp/fm-grok-herdr.gSe0OV/proj                                                                  18K / 500K
+
+
+     ❯ FIRSTMATE_OP: v1 launch-brief: Do not use tools. Do not modify files. Reply with exactly READY and   6:36 PM   █
+       then wait at the composer.                                                                                     █
+                                                                                                                      █
+                                                                                                                      █
+     ◆ Thought for 0.0s                                                                                               █
+                                                                                                                      █
+     READY                                                                                                  6:36 PM   █
+                                                                                                                      █
+     Worked for 2.3s                                                                                                  █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
+                                                                                                                      █
