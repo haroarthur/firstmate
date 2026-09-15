@@ -2203,11 +2203,11 @@ EOF
 
 # fm_backend_herdr_pane_agent_state: classify <pane_id> in <session> as one of
 # dead|no-agent|stale-agent|live|unknown, from the JSON body of two read-only
-# calls plus, for a registered agent, the pane's process-level view - never
-# from process exit status, since a business-logic "not found" response is a
-# normal, expected outcome here, not a call failure (real herdr 0.7.1 exits 1
-# for it; the canned-response test fakes exit 0; parsing only the JSON keeps
-# this function correct against either).
+# calls plus the pane's process-level view - never from process exit status,
+# since a business-logic "not found" response is a normal, expected outcome
+# here, not a call failure (real herdr 0.7.1 exits 1 for it; the canned-response
+# test fakes exit 0; parsing only the JSON keeps this function correct against
+# either).
 #
 #   dead        - `pane get` responds with error code pane_not_found: the pane
 #                 itself is gone (closed, or its process died and herdr already
@@ -2239,12 +2239,12 @@ EOF
 #                 running agent. No registered status outranks the process
 #                 view, because a killed mid-turn agent leaves `working`
 #                 behind just as a quit one leaves `idle`.
-#   live        - `agent get` succeeds with a registered agent_status and the
-#                 process-level view is `agent` or `other`: a harness process
-#                 is running, or something that is not a bare shell is, so the
-#                 registration keeps its authority. An idle or blocked agent
-#                 is still a genuine, still-registered agent, not a restored
-#                 husk, so it is never a close-and-replace candidate.
+#   live        - a registered agent_status whose process-level view is
+#                 `agent` or `other`, or `agent_not_found` whose process-level
+#                 view is `agent`: a harness (or other non-shell) is running,
+#                 including a wrapper Herdr has not registered. An idle or
+#                 blocked registered agent is still a genuine agent, not a
+#                 restored husk, so it is never a close-and-replace candidate.
 #   unknown     - anything else: an unparseable/unexpected response from
 #                 either call, a `pane get` success whose own echoed pane_id
 #                 does not round-trip (guards against misreading a herdr

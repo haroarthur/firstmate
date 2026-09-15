@@ -79,15 +79,17 @@ fm_agent_process_classify_name() {  # <path> [argv0] -> agent|shell|other
 #            on Linux the exec name, on macOS argv[0] truncated to 16 bytes.
 #   <argv0>  argv[0] as the process reports it - a bare name or an install
 #            path, whichever the launcher used (empty when unknown).
-#   <args>   the flattened command line, read only for the node-bundle
-#            harnesses whose identity sits in argv[1] (bin/fm-gemini-lib.sh).
+#   <args>   the flattened command line. Gemini identity can sit in argv[1]
+#            (bin/fm-gemini-lib.sh). Wrapper launchers such as agent-env's
+#            bwrap-around-grok keep the harness only on the inner argv, so
+#            fm_agent_process_args_name_agent also reads this line.
 #   [pid]    when given, lets the Gemini rule read argv boundaries from the
 #            live process instead of the flattened line.
 # fm_agent_process_args_name_agent: true when a flattened command line names a
 # verified harness as a path or bare token. Used for wrapper processes whose
 # own kernel name is not the harness - notably the agent-env `bwrap` launcher
-# around grok 1.0.x, which Herdr and tmux often report as the foreground name
-# while the real `.../grok` binary sits only in the argv after `--`.
+# around grok 1.0.x, which Herdr often reports as the foreground name while
+# the real `.../grok` binary sits only in the argv after `--`.
 fm_agent_process_args_name_agent() {  # <args>
   local args=${1:-} token
   [ -n "$args" ] || return 1

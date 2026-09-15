@@ -18,7 +18,7 @@ Launch shape: `grok --always-approve "$(cat <brief>)"` (Firstmate wraps the brie
 | Model | `--model <model>`; discover current account models with `grok models`. |
 | Effort | `--reasoning-effort <none\|minimal\|low\|medium\|high\|xhigh\|max>`, alias `--effort`; 1.0.24 accepts that full ladder (a model only keeps levels its menu advertises). 0.2.99 accepted only `low\|medium\|high`. Firstmate passes every shared non-default level `low` through `max`; `references/common/model-and-effort.md` owns fallback and unsupported-value handling. |
 | TTY | Interactive TUI and spawn-shaped pane launches need a controlling terminal. A non-TTY probe of 1.0.24 prints `Error: No such device or address (os error 6)` (ENXIO on `/dev/tty`) and exits; that is not the typed Herdr/tmux spawn path. |
-| Process identity | The agent-env launcher wraps the binary in `bwrap` with the real `.../grok` only on the inner argv. `bin/fm-agent-process-lib.sh` classifies that foreground `bwrap` as an agent when the flattened cmdline names grok, so Herdr/tmux liveness does not report a live wrapper as a dead shell. |
+| Process identity | The agent-env launcher wraps the binary in `bwrap` with the real `.../grok` only on the inner argv. `bin/fm-agent-process-lib.sh` classifies that foreground `bwrap` as an agent when the flattened cmdline names grok. `../../../docs/herdr-backend.md` "Restart and liveness behavior" owns the Herdr consequence: that process still reads live when Herdr has not registered the agent. |
 
 Reliable Grok rules must account for hook markers as well as the child fast path.
 `../../../docs/turnend-guard.md` under "Harness integrations" owns the marker contract.
@@ -36,9 +36,6 @@ Tmux and Herdr now route captures through `../../../bin/fm-composer-lib.sh`, whi
 The "Run Grok Build in a project directory?" picker appears only outside a project, such as home, Desktop, Downloads, or `/tmp`.
 The spawn starts in the isolated git root, so Grok trusts it and needs no key.
 For unavoidable non-project launch, `[hints] project_picker_disabled = true` in `~/.grok/config.toml` suppresses the picker.
-
-On 2026-09-15, Herdr lab and tmux spawn-shaped launches of installed 1.0.24 with `--always-approve`, model/effort pins, and a full encode launch-brief stayed alive (`bwrap`+`grok`, Herdr `agent=grok`).
-A prior analytics "dead endpoint" report coincided with the agent-env bwrap wrapper and stale 0.2.x adapter docs; Firstmate now attributes the wrapper via cmdline and treats a process-level harness as live even when Herdr has not yet registered the agent.
 
 ## Composer
 

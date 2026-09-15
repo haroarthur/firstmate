@@ -1250,7 +1250,7 @@ For Pi on Herdr 0.9.0, `herdr agent get` reflects whether the agent process rema
 A Pi launched as a child of the pane shell (not via `exec`) that then `/quit`s or is SIGKILL'd leaves the pane and shell in place, and `agent get` returns `agent_not_found`.
 A sibling live idle Pi stays `agent=pi` with `agent_status=idle`.
 `fm_backend_herdr_pane_agent_state` maps that `agent_not_found` leftover shell to `no-agent` and `fm_backend_herdr_agent_state` maps it to `dead` (relaunch-allowed), while the live idle pane stays `alive`.
-`herdr pane get` `.agent_status` can still read `idle` after the occupant is gone; liveness is `agent get`, never that pane field.
+`herdr pane get` `.agent_status` can still read `idle` after the occupant is gone; liveness is `agent get` plus the process-level view owned by [herdr-backend.md](../herdr-backend.md#restart-and-liveness-behavior), never that pane field.
 
 ```sh
 tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh
