@@ -83,8 +83,26 @@ fm_agent_process_classify_name() {  # <path> [argv0] -> agent|shell|other
 #            harnesses whose identity sits in argv[1] (bin/fm-gemini-lib.sh).
 #   [pid]    when given, lets the Gemini rule read argv boundaries from the
 #            live process instead of the flattened line.
+# fm_agent_process_args_name_agent: true when a flattened command line names a
+# verified harness as a path or bare token. Used for wrapper processes whose
+# own kernel name is not the harness - notably the agent-env `bwrap` launcher
+# around grok 1.0.x, which Herdr and tmux often report as the foreground name
+# while the real `.../grok` binary sits only in the argv after `--`.
+fm_agent_process_args_name_agent() {  # <args>
+  local args=${1:-} token
+  [ -n "$args" ] || return 1
+  # shellcheck disable=SC2086
+  for token in $args; do
+    case "$token" in
+      -*) continue ;;
+    esac
+    [ "$(fm_agent_process_classify_name "$token" "$token")" = agent ] && return 0
+  done
+  return 1
+}
+
 fm_agent_process_classify() {  # <name> <argv0> <args> [pid] -> agent|shell|other
-  local name=${1:-} argv0=${2:-} args=${3:-} pid=${4:-} by_name by_argv0
+  local name=${1:-} argv0=${2:-} args=${3:-} pid=${4:-} by_name by_argv0 base
   by_name=$(fm_agent_process_classify_name "$name" "$argv0")
   [ "$by_name" != agent ] || { printf 'agent'; return 0; }
   if [ -n "$argv0" ]; then
@@ -103,6 +121,21 @@ fm_agent_process_classify() {  # <name> <argv0> <args> [pid] -> agent|shell|othe
     printf 'agent'
     return 0
   fi
+  # Bubblewrap (and a basename match on argv0) is the agent-env grok 1.0.x
+  # launcher: the harness identity lives only on the inner argv. Without this
+  # rule a pane whose foreground name is `bwrap` reads as `other`/`dead` even
+  # while grok is running, which is exactly the false-dead shape that made
+  # native grok relaunch look broken under Herdr.
+  base=${name##*/}
+  base=${base#-}
+  case "$base:${argv0##*/}" in
+    bwrap:*|bubblewrap:*|*:bwrap|*:bubblewrap)
+      if fm_agent_process_args_name_agent "$args"; then
+        printf 'agent'
+        return 0
+      fi
+      ;;
+  esac
   if [ "$by_name" = shell ] && [ "$by_argv0" = shell ]; then
     printf 'shell'
   else

@@ -112,6 +112,21 @@ SH
   pass "fm-lock recognizes grok harness processes"
 }
 
+test_bwrap_wrapper_cmdline_classifies_as_grok_agent() {
+  local got cmdline
+  # shellcheck source=bin/fm-agent-process-lib.sh
+  . "$ROOT/bin/fm-agent-process-lib.sh"
+  cmdline='/nix/store/fake-bwrap/bin/bwrap --die-with-parent --dev-bind / / -- /nix/store/fake-grok/bin/grok --no-memory --always-approve hi'
+  got=$(fm_agent_process_classify bwrap /nix/store/fake-bwrap/bin/bwrap "$cmdline")
+  [ "$got" = agent ] || fail "bwrap foreground with grok on the inner argv must classify as agent, got '$got'"
+  got=$(fm_agent_process_classify bwrap /nix/store/fake-bwrap/bin/bwrap '/nix/store/fake-bwrap/bin/bwrap --die-with-parent -- true')
+  [ "$got" = other ] || fail "bwrap without a harness on the cmdline must stay other, got '$got'"
+  got=$(fm_agent_process_classify grok '' '/nix/store/fake-grok/libexec/grok --no-memory')
+  [ "$got" = agent ] || fail "bare grok name must still classify as agent, got '$got'"
+  pass "bwrap+grok cmdline classifies as a live grok agent"
+}
+
 test_grok_hook_requires_registered_token
 test_grok_teardown_removes_pointer_and_token
 test_fm_lock_recognizes_grok_holder
+test_bwrap_wrapper_cmdline_classifies_as_grok_agent

@@ -1,14 +1,14 @@
 # Grok Build
 
 The xAI `grok` TUI is Claude-Code-compatible.
-Verified initially on 2026-06-29 with 0.2.73, slash submission on 2026-07-03 with 0.2.82, effort on 2026-07-13 with 0.2.99, and exit on 2026-07-19 with 0.2.103.
-Launch shape: `grok --always-approve "$(cat <brief>)"`.
+Verified initially on 2026-06-29 with 0.2.73, slash submission on 2026-07-03 with 0.2.82, effort on 2026-07-13 with 0.2.99, exit on 2026-07-19 with 0.2.103, and re-verified on 2026-09-15 against installed 1.0.24 (default model grok-4.6; account default may still pin grok-4.5).
+Launch shape: `grok --always-approve "$(cat <brief>)"` (Firstmate wraps the brief through `fm-operational-input encode launch-brief`).
 
 ## Operating facts
 
 | Fact | Value |
 |---|---|
-| Busy state | The last rendered-tail fallback, isolated to Grok pending a semantic source: ASCII mid-turn `Ctrl+c:cancel`, absent from idle bar `Shift+Tab:mode │ Ctrl+.:shortcuts`, never the locale-fragile braille spinner. |
+| Busy state | The last rendered-tail fallback, isolated to Grok pending a semantic source: ASCII mid-turn `Ctrl+c:cancel`, absent from idle bar `Shift+Tab:mode │ Ctrl+x:shortcuts` (1.0.x; 0.2.x used `Ctrl+.:shortcuts`), never the locale-fragile braille spinner. |
 | Exit | `/exit` prints `Resume this session with: grok --resume <session-id>`; fallback is `Ctrl+Q` twice within 1000ms, `Ctrl+D` quits in VS Code-family terminals, and `Ctrl+C` interrupts. |
 | Interrupt | Single `Ctrl+C`; Escape only focuses scrollback. |
 | Skill | `/<skill>`, for example `/no-mistakes`, with end-to-end user-skill discovery, invocation, and real `no-mistakes axi run` evidence; the popup may consume Enter and fill an argument placeholder, requiring a real second Enter. |
@@ -16,7 +16,9 @@ Launch shape: `grok --always-approve "$(cat <brief>)"`.
 | Marker | `GROK_AGENT=1` on child or tool processes in 0.2.73 and no `CLAUDECODE`; a 1.0.0 hook instead had `GROK_HOOK_EVENT`, `GROK_HOOK_NAME`, `GROK_SESSION_ID`, and `GROK_WORKSPACE_ROOT` without `GROK_AGENT`, so ancestry guarantees identity. |
 | Resume | `grok --resume <session-id>`, or `grok -c` / `--continue` for cwd latest; `--fork-session` creates a new id. |
 | Model | `--model <model>`; discover current account models with `grok models`. |
-| Effort | `--reasoning-effort <low\|medium\|high>`, alias `--effort`; version 0.2.99 rejects `xhigh` and `max` with `use one of: high, medium, low`; `references/common/model-and-effort.md` owns fallback and unsupported-value handling. |
+| Effort | `--reasoning-effort <none\|minimal\|low\|medium\|high\|xhigh\|max>`, alias `--effort`; 1.0.24 accepts that full ladder (a model only keeps levels its menu advertises). 0.2.99 accepted only `low\|medium\|high`. Firstmate passes every shared non-default level `low` through `max`; `references/common/model-and-effort.md` owns fallback and unsupported-value handling. |
+| TTY | Interactive TUI and spawn-shaped pane launches need a controlling terminal. A non-TTY probe of 1.0.24 prints `Error: No such device or address (os error 6)` (ENXIO on `/dev/tty`) and exits; that is not the typed Herdr/tmux spawn path. |
+| Process identity | The agent-env launcher wraps the binary in `bwrap` with the real `.../grok` only on the inner argv. `bin/fm-agent-process-lib.sh` classifies that foreground `bwrap` as an agent when the flattened cmdline names grok, so Herdr/tmux liveness does not report a live wrapper as a dead shell. |
 
 Reliable Grok rules must account for hook markers as well as the child fast path.
 `../../../docs/turnend-guard.md` under "Harness integrations" owns the marker contract.
@@ -35,6 +37,9 @@ The "Run Grok Build in a project directory?" picker appears only outside a proje
 The spawn starts in the isolated git root, so Grok trusts it and needs no key.
 For unavoidable non-project launch, `[hints] project_picker_disabled = true` in `~/.grok/config.toml` suppresses the picker.
 
+On 2026-09-15, Herdr lab and tmux spawn-shaped launches of installed 1.0.24 with `--always-approve`, model/effort pins, and a full encode launch-brief stayed alive (`bwrap`+`grok`, Herdr `agent=grok`).
+A prior analytics "dead endpoint" report coincided with the agent-env bwrap wrapper and stale 0.2.x adapter docs; Firstmate now attributes the wrapper via cmdline and treats a process-level harness as live even when Herdr has not yet registered the agent.
+
 ## Composer
 
 Fresh placeholder `Type a message...` uses dark 24-bit TRUECOLOR, not SGR-2.
@@ -49,7 +54,7 @@ The shared classifier locates the full box and all content rows, so border curso
 ## Worker turn-end hook
 
 Grok fires `Stop` each turn.
-Project hooks require folder trust in `~/.grok/trusted_folders.toml`, which Firstmate does not edit; global `~/.grok/hooks/` is always trusted.
+Project hooks require folder trust in `~/.grok/trusted_folders.toml`, which Firstmate does not edit; global `~/.grok/hooks/` is always trusted (1.0.x still loads `~/.grok/hooks/*.json`).
 The spawn installs guarded global `fm-turn-end.json` and `fm-turn-end.sh`.
 They act only when workspace `.fm-grok-turnend` matches the registry under `~/.grok/hooks/fm-turn-end.d/`, then touch the task's `state/<id>.turn-ended` through always-set `GROK_WORKSPACE_ROOT`, which equals the worktree.
 This stays outside the worktree, needs no trust grant, and writes only Firstmate files.

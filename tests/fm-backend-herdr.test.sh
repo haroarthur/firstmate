@@ -66,6 +66,20 @@ if [ "${1:-}" = terminal ] && [ "${2:-}" = title ] && [ "${3:-}" = clear ]; then
   printf '{"result":{"reason":"%s"}}\n' "$reason"
   exit 0
 fi
+# pane process-info is now on every agent_not_found classification path.
+# Default: if the next numbered canned response is a process-info body,
+# consume it (so death-close / stale-registration fixtures keep working);
+# otherwise return empty without advancing the counter so later calls
+# (tab create, prune, projection) stay aligned. Empty body reads as
+# unreadable and stays no-agent under the agent_not_found contract.
+# Force numbered consumption with FM_HERDR_SCRIPT_PROCESS_INFO=1.
+if [ "${1:-}" = pane ] && [ "${2:-}" = process-info ] \
+  && [ "${FM_HERDR_SCRIPT_PROCESS_INFO:-0}" != 1 ]; then
+  peek="$RESP/$next.out"
+  if [ ! -f "$peek" ] || ! grep -q 'pane_process_info' "$peek" 2>/dev/null; then
+    exit 0
+  fi
+fi
 n=$next
 echo "$n" > "$COUNT_FILE"
 if [ -f "$RESP/$n.exit" ]; then
@@ -453,6 +467,7 @@ stale_registration_case() {  # <dir-suffix> <agent_status> <process-info-body|->
   done
   fb=$(make_herdr_fakebin "$dir")
   PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    FM_HERDR_SCRIPT_PROCESS_INFO=1 \
     bash -c '. "$0/bin/backends/herdr.sh"
       printf "%s %s " "$(fm_backend_herdr_pane_agent_state fmtest w1:p2)" "$(fm_backend_herdr_agent_state fmtest:w1:p2)"
       fm_backend_herdr_tab_is_husk fmtest w1:p2 && printf husk || printf refused' "$ROOT"
@@ -500,6 +515,28 @@ test_registered_agent_with_a_live_foreground_process_stays_alive() {
   pass "herdr stale registration: a registered agent with a live Pi foreground process still reads alive"
 }
 
+test_unregistered_bwrap_grok_process_reads_live() {
+  local dir="$TMP_ROOT/unreg-bwrap-grok" resp log fb out
+  mkdir -p "$dir/responses"; resp="$dir/responses"; log="$dir/log"; : > "$log"
+  # Three classifier passes (pane state, recovery-grade, husk), each needing
+  # pane get + agent_not_found + process-info.
+  for n in 0 3 6; do
+    printf '{"result":{"pane":{"pane_id":"w1:p2"}}}\n' > "$resp/$((n + 1)).out"
+    printf '{"error":{"code":"agent_not_found","message":"agent target w1:p2 not found"}}\n' > "$resp/$((n + 2)).out"
+    printf '%s\n' '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_process_group_id":4243,"foreground_processes":[{"pid":4243,"name":"bwrap","argv0":"/nix/store/fake/bin/bwrap","argv":["bwrap","--","/nix/store/fake/bin/grok","--always-approve","hi"],"cmdline":"/nix/store/fake/bin/bwrap -- /nix/store/fake/bin/grok --always-approve hi"}]}}}' \
+      > "$resp/$((n + 3)).out"
+  done
+  fb=$(make_herdr_fakebin "$dir")
+  out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    FM_HERDR_SCRIPT_PROCESS_INFO=1 \
+    bash -c '. "$0/bin/backends/herdr.sh"
+      printf "%s %s " "$(fm_backend_herdr_pane_agent_state fmtest w1:p2)" "$(fm_backend_herdr_agent_state fmtest:w1:p2)"
+      fm_backend_herdr_tab_is_husk fmtest w1:p2 && printf husk || printf refused' "$ROOT")
+  [ "$out" = "live alive refused" ] \
+    || fail "agent_not_found over a bwrap+grok process must read live/alive and refuse husk closing; got '$out'"
+  pass "herdr: unregistered bwrap-wrapped grok still reads as a live agent"
+}
+
 test_registered_agent_with_a_non_shell_foreground_process_stays_alive() {
   local out
   # A registered agent running a foreground tool in its own process group is
@@ -527,6 +564,7 @@ settle_registration_case() {  # <dir-suffix> <polls> <process-info-body>...
   done
   fb=$(make_herdr_fakebin "$dir")
   PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    FM_HERDR_SCRIPT_PROCESS_INFO=1 \
     FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS="$polls" \
     bash -c '. "$0/bin/backends/herdr.sh"
       printf "%s %s" "$(fm_backend_herdr_pane_agent_state fmtest w1:p2)" "$(grep -c "process-info" "$1")"' "$ROOT" "$log"
@@ -565,13 +603,34 @@ test_exhausted_settle_window_keeps_a_non_shell_foreground_live() {
   pass "herdr stale registration: an exhausted settle window still reads a non-shell foreground as live"
 }
 
+# Build a long-running binary whose kernel process name is exactly `pi`.
+# A symlink or argv0 rewrite of Nix's coreutils multicall `sleep` fails with
+# `coreutils: unknown program 'pi'`; a shell wrapper that execs sleep replaces
+# the process name with sleep/coreutils; Python/perl wrappers report as the
+# interpreter. A tiny compiled sleeper keeps `comm=pi` on Linux and argv0=pi
+# on macOS so the descendant walk can classify it as an agent.
+compile_named_pi_sleeper() {  # <dest-path>
+  local dest=$1 src
+  src=$(mktemp "${TMPDIR:-/tmp}/fm-pi-sleeper.XXXXXX.c") || return 1
+  cat > "$src" <<'EOF'
+#include <stdlib.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  unsigned n = argc > 1 ? (unsigned)atoi(argv[1]) : 300u;
+  while (n) n = sleep(n);
+  return 0;
+}
+EOF
+  cc -O0 -o "$dest" "$src" || { rm -f "$src"; return 1; }
+  rm -f "$src"
+}
+
 test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive() {
   local lab sleep_bin shell_pid out shell_verdict
   sleep_bin=$(command -v sleep) || fail "sleep not found"
+  command -v cc >/dev/null || fail "cc not found (needed to build a pi-named sleeper)"
   lab="$TMP_ROOT/stale-reg-descendant-bin"; mkdir -p "$lab"
-  # A symlink to a real long-running binary so the kernel records `pi` as the
-  # executable identity (a copied platform binary fails code signing on macOS).
-  ln -sf "$sleep_bin" "$lab/pi"
+  compile_named_pi_sleeper "$lab/pi" || fail "failed to compile pi-named sleeper at $lab/pi"
   # A real shell whose child is that agent-named process, while the canned
   # foreground view shows only the shell (a suspended or backgrounded agent).
   sh -c "'$lab/pi' 300; :" &
@@ -595,13 +654,13 @@ test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_aliv
 }
 
 test_agent_descendant_under_a_spaced_install_path_stays_alive() {
-  local lab sleep_bin shell_pid out
-  sleep_bin=$(command -v sleep) || fail "sleep not found"
+  local lab shell_pid out
+  command -v cc >/dev/null || fail "cc not found (needed to build a pi-named sleeper)"
   # The executable path the process table reports contains a space (the macOS
   # `/Library/Application Support/...` shape), so a field-split read of the
   # process table sees only a fragment of the name.
   lab="$TMP_ROOT/stale-reg-spaced-bin/Application Support/Some Dir"; mkdir -p "$lab"
-  ln -sf "$sleep_bin" "$lab/pi"
+  compile_named_pi_sleeper "$lab/pi" || fail "failed to compile pi-named sleeper at $lab/pi"
   sh -c "'$lab/pi' 300; :" &
   shell_pid=$!
   sleep 0.3
@@ -673,6 +732,7 @@ test_busy_state_never_reports_a_shell_only_pane_busy() {
   shell_only_process_info "$shell_pid" > "$resp/2.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    FM_HERDR_SCRIPT_PROCESS_INFO=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_busy_state fmtest:w1:p2' "$ROOT")
   kill "$shell_pid" 2>/dev/null || true
   [ "$out" = unknown ] \
@@ -685,6 +745,7 @@ test_busy_state_never_reports_a_shell_only_pane_busy() {
   printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_process_group_id":4243,"foreground_processes":[{"pid":4243,"name":"node","argv0":"pi","argv":["pi"],"cmdline":"pi"}]}}}\n' > "$resp/2.out"
   fb=$(make_herdr_fakebin "$dir")
   out=$(PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    FM_HERDR_SCRIPT_PROCESS_INFO=1 \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_busy_state fmtest:w1:p2' "$ROOT")
   [ "$out" = busy ] || fail "a working record with a live Pi foreground must read busy, got '$out'"
 
@@ -3478,7 +3539,7 @@ test_projection_reclaim_replaces_only_exact_husk_and_advances_binding() {
   [ -n "$agent_line" ] && [ "$agent_line" -lt "$close_line" ] \
     || fail "reclaim did not recheck the old pane agent state before the close"
   boundary_mutations=$(sed -n "$((agent_line + 1)),$((close_line - 1))p" "$log" \
-    | grep -Ev $'\x1f(tab\x1flist|pane\x1flist|workspace\x1flist|terminal\x1ftitle\x1fclear)' || true)
+    | grep -Ev $'\x1f(tab\x1flist|pane\x1flist|workspace\x1flist|pane\x1fprocess-info|terminal\x1ftitle\x1fclear)' || true)
   [ -z "$boundary_mutations" ] \
     || fail "reclaim mutated between the old pane agent recheck and the close: $boundary_mutations"
   assert_not_contains "$calls" $'workspace\x1fclose' "reclaim introduced workspace-close authority"
@@ -5218,6 +5279,7 @@ test_recovery_grade_read_widens_only_at_its_own_boundary
 test_stale_registration_over_a_shell_only_pane_is_agent_free
 test_stale_registration_ignores_status_and_reads_the_process
 test_registered_agent_with_a_live_foreground_process_stays_alive
+test_unregistered_bwrap_grok_process_reads_live
 test_registered_agent_with_a_non_shell_foreground_process_stays_alive
 test_transient_prompt_helper_settles_into_stale_agent
 test_exhausted_settle_window_keeps_a_non_shell_foreground_live
