@@ -1,0 +1,35 @@
+{
+  "poll0_stdout": "",
+  "poll0_stderr": "",
+  "poll1_stdout": "",
+  "poll1_stderr": "",
+  "prior_sha256": "8ea51da1c5f733fba279ff84ba526722266f81ece4c7919e4f5c8728756c2ee4",
+  "after_sha256": "8ea51da1c5f733fba279ff84ba526722266f81ece4c7919e4f5c8728756c2ee4",
+  "bytes_identical": true,
+  "clock": {
+    "schema": "fm-contributions-checked.v1",
+    "checked": {
+      "https://github.com/o/r/pull/8": "2026-09-16T09:00:00Z"
+    }
+  },
+  "snapshot": {
+    "known": 1,
+    "checked": 1,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 1,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 1789550100,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "durable_checked_at": "2026-09-15T08:00:00Z"
+}

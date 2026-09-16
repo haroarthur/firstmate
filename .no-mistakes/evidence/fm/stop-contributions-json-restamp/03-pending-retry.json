@@ -1,0 +1,10 @@
+{
+  "poll_stdout": "contribution-wake: check: contributions delivery ee89cced8f63efe97f93a052f98e52a4acd99e50badd2edee5d2d192cc414177\n",
+  "observation_unchanged": true,
+  "pending_unchanged": true,
+  "notified_len": 1,
+  "wake_queue": [
+    "1789598554\t2\tcheck\tcontribution-ee89cced8f63efe97f93a052f98e52a4acd99e50badd2edee5d2d192cc414177\tcheck: contributions delivery ee89cced8f63efe97f93a052f98e52a4acd99e50badd2edee5d2d192cc414177"
+  ],
+  "wake_stdout": "contribution-wake: check: contributions delivery ee89cced8f63efe97f93a052f98e52a4acd99e50badd2edee5d2d192cc414177"
+}

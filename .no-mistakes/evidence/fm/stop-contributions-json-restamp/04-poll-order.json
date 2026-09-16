@@ -1,0 +1,18 @@
+{
+  "calls": [
+    "api repos/o/r/issues/9",
+    "api repos/o/r/issues/9/comments?per_page=100 --paginate --slurp",
+    "api repos/o/r/issues/9/events?per_page=100 --paginate --slurp",
+    "api repos/o/r/pulls/8",
+    "api repos/o/r/issues/8/comments?per_page=100 --paginate --slurp",
+    "api repos/o/r/pulls/8/reviews?per_page=100 --paginate --slurp",
+    "api repos/o/r/pulls/8/comments?per_page=100 --paginate --slurp",
+    "api repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?filter=all&per_page=100 --paginate --slurp",
+    "api repos/o/r/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100 --paginate --slurp",
+    "api repos/o/r",
+    "pr view https://github.com/o/r/pull/8 --json headRefOid,reviewDecision"
+  ],
+  "issue_line": 1,
+  "pull_line": 4,
+  "issue_before_pull": true
+}

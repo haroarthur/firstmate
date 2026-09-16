@@ -1,0 +1,101 @@
+{
+  "initial_poll_stdout": "",
+  "merge_poll_stdout": "",
+  "merge_poll_stderr": "",
+  "observation_state_after_merge": "merged",
+  "snapshot_after_merge": {
+    "known": 1,
+    "checked": 1,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 1
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 1789548300,
+    "captain": [],
+    "captain_omitted": 0,
+    "rows": [
+      {
+        "task": "delivery",
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-09-16T08:30:00Z",
+        "checked": true,
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "verdict": null,
+        "reviews": [],
+        "distinct_checks": 1,
+        "missing_verdicts": 0,
+        "pending_checks": 0,
+        "failed_checks": 0,
+        "stale_verdicts": 0,
+        "signals": [],
+        "actor": "nobody",
+        "reason": "forge reports merged",
+        "tasks": [
+          "delivery"
+        ]
+      }
+    ]
+  },
+  "stable_poll_stdout": "",
+  "bytes_identical_on_stable_merged_repoll": true,
+  "prior_sha256": "4d7d1a9b93aa75ebec0193ea5be18ad8bf3f1cf20ab15e9e7069506e1566d296",
+  "after_sha256": "4d7d1a9b93aa75ebec0193ea5be18ad8bf3f1cf20ab15e9e7069506e1566d296",
+  "durable_checked_at_after_skip": "2026-09-15T08:00:00Z",
+  "clock": {
+    "schema": "fm-contributions-checked.v1",
+    "checked": {
+      "https://github.com/o/r/pull/8": "2026-09-16T09:00:00Z"
+    }
+  },
+  "snapshot_after_stable_skip": {
+    "known": 1,
+    "checked": 1,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 1
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 1789550100,
+    "captain": [],
+    "captain_omitted": 0,
+    "rows": [
+      {
+        "task": "delivery",
+        "url": "https://github.com/o/r/pull/8",
+        "kind": "pr",
+        "checked_at": "2026-09-16T09:00:00Z",
+        "checked": true,
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "verdict": null,
+        "reviews": [],
+        "distinct_checks": 1,
+        "missing_verdicts": 0,
+        "pending_checks": 0,
+        "failed_checks": 0,
+        "stale_verdicts": 0,
+        "signals": [],
+        "actor": "nobody",
+        "reason": "forge reports merged",
+        "tasks": [
+          "delivery"
+        ]
+      }
+    ]
+  }
+}

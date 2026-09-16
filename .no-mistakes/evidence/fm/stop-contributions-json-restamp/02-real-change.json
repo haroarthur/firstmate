@@ -1,0 +1,23 @@
+{
+  "poll_stdout": "contribution-wake: check: contributions delivery 54ab06b3900d8ee3f02fe8ef30ce8e70fef3e027e2b6841a20f33a4bab9f1a66\n",
+  "poll_stderr": "",
+  "identical_to_prior": false,
+  "checked_at": "2026-09-16T09:01:00Z",
+  "pending_len": 1,
+  "pending": [
+    {
+      "token": "comment:44:2026-09-16T09:01:00Z:",
+      "type": "comment",
+      "source": "https://github.com/o/r/pull/8#issuecomment-44",
+      "head": null,
+      "author": "maintainer",
+      "body": "Please clarify the contract"
+    }
+  ],
+  "clock": {
+    "schema": "fm-contributions-checked.v1",
+    "checked": {
+      "https://github.com/o/r/pull/8": "2026-09-16T09:01:00Z"
+    }
+  }
+}

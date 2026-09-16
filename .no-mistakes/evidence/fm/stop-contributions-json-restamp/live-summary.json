@@ -1,0 +1,14 @@
+{
+  "all_pass": true,
+  "product": "bin/fm-contributions.sh poll/snapshot",
+  "scenarios": [
+    {"name": "stable re-poll leaves contributions.json byte-identical and stamps state clock", "pass": true},
+    {"name": "real maintainer comment rewrites contributions.json pending and checked_at", "pass": true},
+    {"name": "stale file checked_at does not expire a just-reobserved open PR", "pass": true},
+    {"name": "merged PR stable re-poll stays nobody, not terminal-refresh fleet work", "pass": true},
+    {"name": "unchanged observation still retries pending wake publication", "pass": true},
+    {"name": "poll observes the older state-clock URL first", "pass": true},
+    {"name": "budget exhaustion leaves contributions.json and state clock untouched", "pass": true},
+    {"name": "failed owner-record persist does not stamp a newer state clock", "pass": true}
+  ]
+}

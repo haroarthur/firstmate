@@ -1,0 +1,23 @@
+{
+  "initial_rc": 0,
+  "persist_rc": 1,
+  "stdout": "",
+  "stderr": "mktemp: failed to create file via template \u2018/tmp/fm-contrib-live-persist-01M2P3WY8RWVB06R7C4GCC0WJR/s7-persist/data/delivery/.contributions.XXXXXX\u2019: Permission denied\n",
+  "clock_before": {
+    "schema": "fm-contributions-checked.v1",
+    "checked": {
+      "https://github.com/o/r/pull/8": "2026-09-16T08:00:00Z"
+    }
+  },
+  "clock_after": {
+    "schema": "fm-contributions-checked.v1",
+    "checked": {
+      "https://github.com/o/r/pull/8": "2026-09-16T08:00:00Z"
+    }
+  },
+  "clock_unchanged": true,
+  "new_now_not_stamped": true,
+  "record_bytes_unchanged": true,
+  "pending_len": 0,
+  "record_checked_at": "2026-09-16T08:00:00Z"
+}
