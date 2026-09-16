@@ -40,9 +40,11 @@
 # an error. A successful or failed observation rewrites the durable file only
 # when observation, error, or pending actually changed; a checked_at-only
 # restamp is forbidden so stable or already-merged contributions do not churn
-# backups. Freshness and poll order live in state/contributions-checked.json
-# (url -> checked_at), stamped on every completed observation; record.checked_at
-# is only the fallback when that local clock has no entry.
+# backups. Unchanged observations still retry pending wake publication.
+# Freshness and poll order live in state/contributions-checked.json
+# (url -> checked_at), stamped after owner records for that observation are
+# persisted; record.checked_at is only the fallback when that local clock has
+# no entry.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
@@ -322,7 +324,6 @@ poll() {
     # every owner's prior record and local clock so the URL is observed first next poll.
     [ "$BUDGET_EXHAUSTED" -eq 0 ] || break
     [ "$observed" -eq 0 ] || printf 'contributions: observation unavailable for %s\n' "$url"
-    write_checked "$url" "$NOW"
     case "$url" in */issues/*) kind=issue ;; *) kind="pr" ;; esac
     for task in "${row[@]:1}"; do
       fm_pr_task_id_valid "$task" || { printf 'contributions: invalid durable task id\n'; continue; }
@@ -346,15 +347,15 @@ poll() {
       fi
       # Do not rewrite durable bytes when only the observation clock moved.
       # -n is required: this runs inside a while-read over known.tsv on stdin.
-      if jq -ne --slurpfile old "$old" --slurpfile row "$TMP/row.json" '
+      if ! jq -ne --slurpfile old "$old" --slurpfile row "$TMP/row.json" '
         ($old[0] | {observation, error, pending: (.pending // [])})
         == ($row[0] | {observation, error, pending: (.pending // [])})
       ' >/dev/null; then
-        continue
+        write_record "$task" "$TMP/row.json"
       fi
-      write_record "$task" "$TMP/row.json"
       publish_pending "$task" "$url" "$TMP/row.json"
     done
+    write_checked "$url" "$NOW"
   done < "$TMP/known.tsv"
 }
 

@@ -601,6 +601,7 @@ test_budget_exhaustion_keeps_prior_record() { # exhaust|hang
     || fail "budget exhaustion ($mode) never started the observation"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
     || fail "budget exhaustion ($mode) rewrote the prior record: $(cat "$home/data/delivery/contributions.json")"
+  [ ! -e "$home/state/contributions-checked.json" ] || fail "budget exhaustion ($mode) stamped the local clock"
   [ ! -s "$home/state/.wake-queue" ] || fail "budget exhaustion ($mode) enqueued a wake"
   pass "budget exhausted mid-observation ($mode) keeps the prior record and stays silent"
 }
@@ -644,6 +645,35 @@ test_poll_skips_checked_at_only_restamp() {
     "$home/data/delivery/contributions.json" >/dev/null \
     || fail 'a real observation change did not rewrite pending and checked_at'
   pass 'poll skips a checked_at-only restamp and still writes real observation changes'
+}
+
+test_poll_retries_pending_wake_on_restamp_skip() {
+  local home out wakes
+  home=$(new_home restamp-pending)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null \
+    || fail 'initial poll failed before pending-retry regression'
+  jq -n --arg head "$HEAD_A" '[{id:12,user:{login:"maintainer"},author_association:"OWNER",
+    body:"Please clarify the contract",html_url:"https://github.com/o/r/pull/8#issuecomment-12",
+    updated_at:"2026-09-16T08:01:00Z"}]' > "$home/forge/comments.json"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null \
+    || fail 'signal poll failed before pending-retry regression'
+  mutate_record "$home" delivery '.records[0].notified=[]'
+  rm -f "$home/state/.wake-queue"
+  cp "$home/data/delivery/contributions.json" "$home/prior.json"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) \
+    || fail 'restamp-skip pending retry failed'
+  printf '%s\n' "$out" | grep -E '^contribution-wake: check: contributions delivery [0-9a-f]{64}$' >/dev/null \
+    || fail "unchanged observation did not retry pending wake publication: $out"
+  wakes=$(awk -F '\t' 'NF >= 5 && $3 == "check" { count++ } END { print count + 0 }' "$home/state/.wake-queue")
+  [ "$wakes" = 1 ] || fail "pending retry created $wakes durable wakes"
+  jq -e --slurpfile prior "$home/prior.json" '
+    .records[0].observation == $prior[0].records[0].observation
+    and .records[0].pending == $prior[0].records[0].pending
+    and (.records[0].notified | length) == 1' \
+    "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'pending retry lost the signal or skipped notification'
+  pass 'poll retries pending wake publication when skipping a restamp'
 }
 
 test_poll_order_follows_state_clock() {
@@ -710,7 +740,7 @@ test_shared_url_observed_once() {
 }
 
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_budget_refusal_between_calls test_budget_bounded_call_timeout test_poll_skips_checked_at_only_restamp test_poll_order_follows_state_clock test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_budget_refusal_between_calls test_budget_bounded_call_timeout test_poll_skips_checked_at_only_restamp test_poll_retries_pending_wake_on_restamp_skip test_poll_order_follows_state_clock test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
