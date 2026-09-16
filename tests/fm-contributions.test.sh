@@ -44,6 +44,18 @@ mutate_record() {
   mv "$1/update.json" "$1/data/$2/contributions.json"
 }
 
+stamp_checked() { # home url iso
+  local home=$1 url=$2 at=$3 file="$1/state/contributions-checked.json"
+  mkdir -p "$home/state"
+  if [ -f "$file" ]; then
+    jq --arg url "$url" --arg at "$at" '.checked[$url]=$at' "$file" > "$home/clock.json" || fail 'clock stamp failed'
+    mv "$home/clock.json" "$file"
+  else
+    jq -n --arg url "$url" --arg at "$at" '{schema:"fm-contributions-checked.v1",checked:{($url):$at}}' > "$file" \
+      || fail 'clock stamp failed'
+  fi
+}
+
 test_actor_coverage() {
   local home out
   home=$(new_home actors)
@@ -288,7 +300,7 @@ test_verdict_retains_judged_head() {
   printf '%s\n' "$HEAD_B" > "$home/forge/head"
   registered_checks "$home" >/dev/null
   printf 'pr=https://github.com/o/r/pull/8\npr_head=%s\n' "$HEAD_B" >> "$home/state/delivery.meta"
-  mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
+  stamp_checked "$home" https://github.com/o/r/pull/8 2026-09-15T08:00:00Z
   bearings "$home" | jq -e '.contributions.stale_verdicts == 1 and .contributions.checked == 0' >/dev/null \
     || fail 'changed published head reused a current verdict'
   jq -e --arg head "$HEAD_A" '.records[0].verdict.head==$head' "$home/data/delivery/contributions.json" >/dev/null \
@@ -609,6 +621,17 @@ test_poll_skips_checked_at_only_restamp() {
   [ -z "$out" ] || fail "stable re-poll printed a wake line: $out"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
     || fail "stable re-poll restamped checked_at: $(cat "$home/data/delivery/contributions.json")"
+  jq -e --arg now 2026-09-16T09:00:00Z --arg url https://github.com/o/r/pull/8 \
+    '.checked[$url] == $now' "$home/state/contributions-checked.json" >/dev/null \
+    || fail "stable re-poll did not stamp the local observation clock: $(cat "$home/state/contributions-checked.json")"
+  with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" \
+    || fail 'could not collect contribution input after restamp skip'
+  out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW=2026-09-16T09:00:00Z \
+    "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json") \
+    || fail 'could not project after restamp skip'
+  printf '%s' "$out" | jq -e '.checked == 1 and .complete == true' >/dev/null \
+    || fail "stable re-poll left the contribution expired: $out"
   jq -n --arg head "$HEAD_A" '[{id:44,user:{login:"maintainer"},author_association:"OWNER",
     body:"Please clarify the contract",html_url:"https://github.com/o/r/pull/8#issuecomment-44",
     updated_at:"2026-09-16T09:01:00Z"}]' > "$home/forge/comments.json"
@@ -621,6 +644,25 @@ test_poll_skips_checked_at_only_restamp() {
     "$home/data/delivery/contributions.json" >/dev/null \
     || fail 'a real observation change did not rewrite pending and checked_at'
   pass 'poll skips a checked_at-only restamp and still writes real observation changes'
+}
+
+test_poll_order_follows_state_clock() {
+  local home pull_line issue_line
+  home=$(new_home clock-order)
+  forge_home "$home"
+  printf -- '- [ ] filed - Filed https://github.com/o/r/issues/9 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null \
+    || fail 'initial poll failed before clock-order regression'
+  stamp_checked "$home" https://github.com/o/r/issues/9 2026-09-16T07:00:00Z
+  wrap_forge "$home"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null \
+    || fail 'clock-order poll failed'
+  pull_line=$(grep -nFx 'api repos/o/r/pulls/8' "$home/forge/calls" | head -1 | cut -d: -f1)
+  issue_line=$(grep -nFx 'api repos/o/r/issues/9' "$home/forge/calls" | head -1 | cut -d: -f1)
+  [ -n "$pull_line" ] && [ -n "$issue_line" ] || fail "clock-order poll missed a forge read: $(cat "$home/forge/calls")"
+  [ "$issue_line" -lt "$pull_line" ] \
+    || fail "poll order ignored the local observation clock: $(cat "$home/forge/calls")"
+  pass 'poll observes the oldest local clock entry first'
 }
 
 test_genuine_failure_near_deadline_is_unavailable() {
@@ -668,7 +710,7 @@ test_shared_url_observed_once() {
 }
 
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_budget_refusal_between_calls test_budget_bounded_call_timeout test_poll_skips_checked_at_only_restamp test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_budget_refusal_between_calls test_budget_bounded_call_timeout test_poll_skips_checked_at_only_restamp test_poll_order_follows_state_clock test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"

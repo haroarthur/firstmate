@@ -36,10 +36,13 @@
 # Oldest observations go first, so a large corpus progresses across polls.
 # Each distinct URL is observed once per poll and applied to every owner. When
 # the budget runs out mid-observation, the poll ends with that URL's records
-# untouched; only a genuine forge failure or head change records an error.
-# A successful or failed observation rewrites the durable file only when
-# observation, error, or pending actually changed; a checked_at-only restamp
-# is forbidden so stable or already-merged contributions do not churn backups.
+# and local clock untouched; only a genuine forge failure or head change records
+# an error. A successful or failed observation rewrites the durable file only
+# when observation, error, or pending actually changed; a checked_at-only
+# restamp is forbidden so stable or already-merged contributions do not churn
+# backups. Freshness and poll order live in state/contributions-checked.json
+# (url -> checked_at), stamped on every completed observation; record.checked_at
+# is only the fallback when that local clock has no entry.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
@@ -126,11 +129,22 @@ get_input() {
   "$SCRIPT_DIR/fm-fleet-snapshot.sh" --contribution-input > "$TMP/input.json"
 }
 
+read_clock() {
+  local file="$STATE/contributions-checked.json"
+  if [ -d "$STATE" ] && [ ! -L "$STATE" ] && [ -f "$file" ] && [ ! -L "$file" ] \
+    && jq -e '.schema == "fm-contributions-checked.v1" and (.checked | type == "object")' "$file" >/dev/null 2>&1; then
+    cp "$file" "$TMP/clock.json"
+  else
+    printf '%s\n' '{"schema":"fm-contributions-checked.v1","checked":{}}' > "$TMP/clock.json"
+  fi
+}
+
 project() {
   jq_lib -n --slurpfile input "$1" --slurpfile saved "$TMP/saved.json" \
+    --slurpfile clock "$TMP/clock.json" \
     --argjson now "$EPOCH" --argjson max_age "$MAX_AGE" --argjson errors "$ERRORS" \
     --arg all "${2:-}" '
-    projected($input[0];$saved[0];$now;$max_age) as $rows
+    projected($input[0];$saved[0];$now;$max_age;($clock[0].checked // {})) as $rows
     | summary($rows;($errors + (if $input[0].backlog.present == true then 0 else 1 end)))
     | .valid_until += $max_age
     | .captain_omitted = ([0, (.captain | length) - 20] | max)
@@ -169,6 +183,22 @@ write_record() { # task record-json-file
   fi
   chmod 600 "$staged"
   fm_pr_regular_destination_on_device_or_absent "$file" "$device" || fail 'contribution destination changed'
+  mv -f -- "$staged" "$file"
+}
+
+write_checked() { # url iso-timestamp
+  local url=$1 at=$2 file="$STATE/contributions-checked.json" device staged
+  [ -d "$STATE" ] && [ ! -L "$STATE" ] || fail 'state directory unavailable'
+  device=$(fm_pr_file_device "$STATE")
+  fm_pr_regular_destination_on_device_or_absent "$file" "$device" || fail 'unsafe contribution clock destination'
+  staged=$(umask 077; mktemp "$STATE/.contributions-checked.XXXXXX")
+  if [ -f "$file" ] && jq -e '.schema == "fm-contributions-checked.v1" and (.checked | type == "object")' "$file" >/dev/null 2>&1; then
+    jq --arg url "$url" --arg at "$at" '.checked[$url]=$at' "$file" > "$staged"
+  else
+    jq -n --arg url "$url" --arg at "$at" '{schema:"fm-contributions-checked.v1",checked:{($url):$at}}' > "$staged"
+  fi
+  chmod 600 "$staged"
+  fm_pr_regular_destination_on_device_or_absent "$file" "$device" || fail 'contribution clock destination changed'
   mv -f -- "$staged" "$file"
 }
 
@@ -271,10 +301,13 @@ poll() {
   acquire
   get_input
   read_saved
+  read_clock
   [ "$ERRORS" -eq 0 ] || printf 'contributions: %s unreadable durable record(s)\n' "$ERRORS"
   # One line per distinct URL: the URL, then every owning task.
-  jq_lib -nr --slurpfile input "$TMP/input.json" --slurpfile saved "$TMP/saved.json" '
-    known($input[0];$saved[0]) | map(. as $k | . + {at:([$saved[0][] | select(.task == $k.task) | .records[] | select(.url == $k.url) | .checked_at] | first // "")})
+  jq_lib -nr --slurpfile input "$TMP/input.json" --slurpfile saved "$TMP/saved.json" \
+    --slurpfile clock "$TMP/clock.json" '
+    ($clock[0].checked // {}) as $clock
+    | known($input[0];$saved[0]) | map(. as $k | . + {at:(observation_time($k.url; ([$saved[0][] | select(.task == $k.task) | .records[] | select(.url == $k.url)] | first // {}); $clock) // "")})
     | group_by(.url) | map({url:.[0].url,at:(map(.at) | min),tasks:(map(.task) | unique)})
     | sort_by(.at,.tasks[0],.url)[] | [.url] + .tasks | @tsv' > "$TMP/known.tsv"
   DEADLINE=$(( $(date +%s) + BUDGET ))
@@ -286,9 +319,10 @@ poll() {
     observed=0
     observe "$url" || observed=$?
     # An observation the budget cut short is unmeasured, not unavailable: keep
-    # every owner's prior record so the URL is observed first next poll.
+    # every owner's prior record and local clock so the URL is observed first next poll.
     [ "$BUDGET_EXHAUSTED" -eq 0 ] || break
     [ "$observed" -eq 0 ] || printf 'contributions: observation unavailable for %s\n' "$url"
+    write_checked "$url" "$NOW"
     case "$url" in */issues/*) kind=issue ;; *) kind="pr" ;; esac
     for task in "${row[@]:1}"; do
       fm_pr_task_id_valid "$task" || { printf 'contributions: invalid durable task id\n'; continue; }
@@ -351,6 +385,7 @@ case "${1:-}" in
   snapshot)
     [ "$#" -ge 2 ] && [ "$#" -le 3 ] || fail 'snapshot needs canonical input'
     read_saved
+    read_clock
     project "$2" "${3:-}"
     ;;
   poll) poll ;;
