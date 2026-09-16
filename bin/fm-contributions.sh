@@ -37,6 +37,9 @@
 # Each distinct URL is observed once per poll and applied to every owner. When
 # the budget runs out mid-observation, the poll ends with that URL's records
 # untouched; only a genuine forge failure or head change records an error.
+# A successful or failed observation rewrites the durable file only when
+# observation, error, or pending actually changed; a checked_at-only restamp
+# is forbidden so stable or already-merged contributions do not churn backups.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
@@ -306,6 +309,14 @@ poll() {
       else
         error='forge observation unavailable or changed during read'
         jq --arg now "$NOW" --arg error "$error" '.checked_at=$now | .error=$error' "$old" > "$TMP/row.json"
+      fi
+      # Do not rewrite durable bytes when only the observation clock moved.
+      # -n is required: this runs inside a while-read over known.tsv on stdin.
+      if jq -ne --slurpfile old "$old" --slurpfile row "$TMP/row.json" '
+        ($old[0] | {observation, error, pending: (.pending // [])})
+        == ($row[0] | {observation, error, pending: (.pending // [])})
+      ' >/dev/null; then
+        continue
       fi
       write_record "$task" "$TMP/row.json"
       publish_pending "$task" "$url" "$TMP/row.json"
