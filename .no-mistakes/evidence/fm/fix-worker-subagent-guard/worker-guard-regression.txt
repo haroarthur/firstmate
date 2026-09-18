@@ -1,0 +1,12 @@
+==============================================================
+ REGRESSION: same worker worktree, BASE daaffdb vs FIX aa61be9
+ tool = Agent (harness subagent the incident used)
+==============================================================
+
+--- BASE commit daaffdb (before the fix) ---
+Agent in worker worktree -> exit=0
+=> SILENTLY ALLOWED: worker could spawn an unaccounted subagent (the control incident).
+
+--- FIX commit aa61be9 (current worktree) ---
+Agent in worker worktree -> exit=2
+=> DENIED with the one-agent reason: control incident closed.

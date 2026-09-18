@@ -1,0 +1,23 @@
+==============================================================
+ DURABLE FIX: PreToolUse guard now reaches a SPAWNED WORKER
+ (a linked crewmate worktree - the shape fm-spawn.sh hands out)
+==============================================================
+
+--- Scenario A: crewmate worker reaches for the harness Agent tool ---
+\$ echo {"tool_name":"Agent"} | fm-subagent-pretool-check.sh  (run from worker worktree)
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] this spawned worker does the assigned work itself: harness subagents and forks are not fleet-accounted. Do the work in this session (blocked tool: Agent, delegation-shaped on \"agent\"). Launch with --allow-subagents, or a brief that names Worker delegation: subagents=on, for a deliberate exception."}
+exit=2  (2 = DENY)
+deny message:
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[subagent-dispatch] this spawned worker does the assigned work itself: harness subagents and forks are not fleet-accounted. Do the work in this session (blocked tool: Agent, delegation-shaped on \"agent\"). Launch with --allow-subagents, or a brief that names Worker delegation: subagents=on, for a deliberate exception."}
+
+--- Scenario B: same worker reaches for a background fork (the actual incident) ---
+ForkSession -> exit=2  (2 = DENY, 'fork' stem now classified)
+
+--- Scenario C: worker does ordinary work (Bash/Edit) - must NOT be blocked ---
+Bash -> exit=0  (0 = ALLOW)
+Edit -> exit=0  (0 = ALLOW)
+Read -> exit=0  (0 = ALLOW)
+Write -> exit=0  (0 = ALLOW)
+
+--- Scenario D: deliberate opt-in (task briefed with subagents=on) releases the guard ---
+Agent with FM_ALLOW_SUBAGENT=1 -> exit=0  (0 = ALLOW, deliberate exception)
