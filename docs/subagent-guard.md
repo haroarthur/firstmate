@@ -157,6 +157,7 @@ Default Claude launches pass `--disallowedTools Agent,Task,Fork` and install a P
 Default Codex launches pass `--disable multi_agent`.
 `--allow-subagents`, or a brief that carries the exact line `Worker delegation: subagents=on` from `bin/fm-brief.sh --allow-subagents`, sets `FM_ALLOW_SUBAGENT=1`, omits those launch denials, and records `subagents=on` in task metadata so a relaunch keeps the posture.
 Cursor Agent CLI exposes no verified tool-deny or subagent-disable switch; workers rely on the brief one-agent rule, and a firstmate-repo Cursor worker may still hit this checker through Claude-compatible settings loading.
+Muse exposes no verified subagent-disable switch either, since `--subagent-worktree-isolation` only isolates child worktrees rather than turning native sub-agents off, so Muse workers rely on the brief one-agent rule.
 Primary and secondmate launches are unchanged by those worker flags.
 
 ## Escape hatch
@@ -195,6 +196,7 @@ Applicability turns on one question: does the harness expose built-in delegation
 | Codex | `multi_agent` feature (stable, default on in current CLI) | Crewmate and scout launches pass `--disable multi_agent`. Primary Codex sessions are unchanged by this worker fix. Historical 0.144.1 enumeration below recorded no subagent *tool*; the feature flag is the switch the current CLI exposes. |
 | Cursor | unverified tool name | No verified `--disallowedTools` or equivalent launch switch. Workers rely on the brief one-agent rule. A firstmate-repo worker may still hit this checker through Claude-compatible settings loading. |
 | Grok | present, exact tokens unconfirmed | Not wired pending live verification. See below. |
+| Muse | native sub-agents, documented | No verified subagent-disable switch; `--subagent-worktree-isolation` only isolates child worktrees rather than turning native sub-agents off. Workers rely on the brief one-agent rule. |
 | omp | present, per bundled material | Not wired and unverified. omp ships a built-in task delegation tool: its bundled docs list `tools/task.md` and the captain-level `task.maxConcurrency` setting governs it. No Firstmate delegation seatbelt is wired for it yet, and its status stays unverified until a live tool enumeration is recorded the way the Codex row was. |
 | OpenCode | present, exact tokens unconfirmed | Not wired pending live verification. See below. |
 | Pi | none reported | Not wired pending live verification. See below. |

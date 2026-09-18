@@ -58,6 +58,7 @@ An open run is trusted busy and settled log trusted idle; missing binding or mat
 ## Native sub-agents and worktrees
 
 Native children use per-child worktrees only with opt-in `--subagent-worktree-isolation`; capability says default-on while omission stays shared, and verified labs produced no nested copy.
+No verified switch turns those native sub-agents off - `--subagent-worktree-isolation` only isolates child worktrees - so a spawned Muse worker relies on the brief one-agent rule, and `../../../docs/subagent-guard.md` owns that gap.
 `../../../bin/fm-teardown.sh` excludes no Muse path.
 It excludes `.claude/settings.local.json` because Firstmate writes it, but Muse scratch is worker output and must refuse cleanup when uncommitted.
 Inspect, never force past, that refusal.
