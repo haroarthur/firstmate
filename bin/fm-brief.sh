@@ -14,8 +14,8 @@
 # charters still use a single `{TASK}` charter fill. Firstmate may adjust other
 # sections when the task genuinely deviates (e.g. working an existing external
 # PR instead of shipping a new one).
-# Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--herdr-lab]
-#        fm-brief.sh <task-id> <repo-name> --scout [--herdr-lab]
+# Usage: fm-brief.sh <task-id> <repo-name> --mode <no-mistakes|direct-PR|local-only> [--herdr-lab] [--allow-subagents]
+#        fm-brief.sh <task-id> <repo-name> --scout [--herdr-lab] [--allow-subagents]
 #        fm-brief.sh <task-id> --secondmate {<project>...|--no-projects}
 #   --scout writes the scout contract instead: the deliverable is a report at
 #   data/<task-id>/report.md (no branch, no push, no PR) and the worktree is scratch.
@@ -38,6 +38,11 @@
 #   after scaffolding and the caller-supplied repo string cannot reliably
 #   identify this repo. Briefs made without it carry a loud declaration so an
 #   omitted contract cannot be silent.
+#   --allow-subagents writes the exact marker `Worker delegation: subagents=on`
+#   under ## Firstmate spec and the matching one-line allowance. Default
+#   scaffolds say "Do not spawn subagents; one agent does this work."
+#   Refused on --secondmate. bin/fm-spawn.sh honours that marker or its own
+#   --allow-subagents flag; docs/subagent-guard.md owns the guard.
 # For ship tasks, --mode is REQUIRED and shapes the definition of done. Firstmate
 # resolves it per task at intake (AGENTS.md section 7); data/projects.md holds the
 # captain's standing posture as context, and this script never reads it:
@@ -124,6 +129,7 @@ fi
 KIND=ship
 HERDR_LAB=0
 NO_PROJECTS=0
+ALLOW_SUBAGENTS=0
 MODE=
 MODE_SET=0
 POS=()
@@ -144,6 +150,7 @@ for a in "$@"; do
     --scout) KIND=scout ;;
     --secondmate) KIND=secondmate ;;
     --herdr-lab) HERDR_LAB=1 ;;
+    --allow-subagents) ALLOW_SUBAGENTS=1 ;;
     --no-projects) NO_PROJECTS=1 ;;
     --mode) want_value=mode ;;
     --mode=*) MODE=${a#--mode=}; MODE_SET=1 ;;
@@ -178,6 +185,11 @@ ID=${POS[0]}
 
 if [ "$KIND" = secondmate ] && [ "$HERDR_LAB" -eq 1 ]; then
   echo "error: --herdr-lab applies only to crewmate ship or scout briefs" >&2
+  exit 1
+fi
+
+if [ "$KIND" = secondmate ] && [ "$ALLOW_SUBAGENTS" -eq 1 ]; then
+  echo "error: --allow-subagents applies only to ship and scout briefs; a secondmate is a primary in its own home" >&2
   exit 1
 fi
 
@@ -348,12 +360,19 @@ EOF
 HERDR_SECTION=${HERDR_SECTION%$'\n'}
 fi
 
-IFS= read -r -d '' TASK_SECTION <<'EOF' || true
+if [ "$ALLOW_SUBAGENTS" -eq 1 ]; then
+  SPEC_RULE='Worker delegation: subagents=on
+This task allows subagents.'
+else
+  SPEC_RULE='Do not spawn subagents; one agent does this work.'
+fi
+IFS= read -r -d '' TASK_SECTION <<EOF || true
 # Task
 ## Captain's intent
 {TASK}
 
 ## Firstmate spec
+$SPEC_RULE
 {FIRSTMATE_SPEC}
 EOF
 TASK_SECTION=${TASK_SECTION%$'\n'}

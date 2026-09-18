@@ -22,7 +22,7 @@ Validate changes against the real harness in a scratch project before trusting t
 
 A primary must also account for built-in delegation that can create work outside Firstmate's durable records.
 Claude's verified delegation guard is in `references/harness/claude.md`.
-`../../../docs/subagent-guard.md` owns its full contract, local hardening, escape hatch, and per-harness applicability review.
+`../../../docs/subagent-guard.md` owns its full contract, worker one-agent extension, local hardening, escape hatch, and per-harness applicability review.
 Never generalize Claude tool names or permissions without live evidence.
 
 ## Session start

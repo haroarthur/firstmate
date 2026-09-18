@@ -244,7 +244,7 @@ test_claude_hooks_semantic_lifecycle() {
   settings="$WT_DIR/.claude/settings.local.json"
   assert_present "$settings" "claude spawn did not write hook settings"
   jq -e . "$settings" >/dev/null || fail "claude hook settings are not valid JSON"
-  for ev in UserPromptSubmit Stop StopFailure SessionEnd; do
+  for ev in UserPromptSubmit Stop StopFailure SessionEnd PreToolUse; do
     jq -e ".hooks[\"$ev\"]" "$settings" >/dev/null || fail "claude hook settings lack $ev"
   done
 
@@ -270,6 +270,39 @@ test_claude_hooks_semantic_lifecycle() {
   out=$(classify claude "$id" "$state")
   [ "$out" = "idle claude-hook" ] || fail "SessionEnd must classify idle, got '$out'"
   pass "claude hooks open on UserPromptSubmit and close on Stop, StopFailure, and SessionEnd"
+}
+
+test_claude_worker_pretool_hook_blocks_agent_and_opt_in_re_enables() {
+  local rec id out settings cmd rc
+  id=busy-cl-subagent-1
+  rec=$(make_spawn_case claude-worker-subagent claude "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR")
+  expect_code 0 $? "claude spawn should succeed: $out"
+  settings="$WT_DIR/.claude/settings.local.json"
+  cmd=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")
+  [ -n "$cmd" ] && [ "$cmd" != null ] || fail "claude spawn did not install a PreToolUse worker hook"
+  case "$cmd" in
+    *fm-subagent-pretool-check.sh*--worker*) ;;
+    *) fail "PreToolUse hook must call fm-subagent-pretool-check.sh --worker: $cmd" ;;
+  esac
+  rc=0
+  printf '%s' '{"tool_name":"Agent"}' | sh -c "$cmd" >/dev/null 2>"$TMP_ROOT/worker-deny.err" || rc=$?
+  [ "$rc" -eq 2 ] || fail "spawned-worker PreToolUse hook must deny Agent, got exit $rc: $(cat "$TMP_ROOT/worker-deny.err")"
+  grep -q 'this spawned worker does the assigned work itself' "$TMP_ROOT/worker-deny.err" \
+    || fail "worker hook deny must use the one-agent reason: $(cat "$TMP_ROOT/worker-deny.err")"
+
+  id=busy-cl-subagent-optin
+  rec=$(make_spawn_case claude-worker-subagent-optin claude "$id")
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --allow-subagents)
+  expect_code 0 $? "claude --allow-subagents spawn should succeed: $out"
+  settings="$WT_DIR/.claude/settings.local.json"
+  cmd=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$settings")
+  rc=0
+  printf '%s' '{"tool_name":"Agent"}' | FM_ALLOW_SUBAGENT=1 sh -c "$cmd" >/dev/null 2>"$TMP_ROOT/worker-allow.err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "opt-in worker hook must allow Agent, got exit $rc: $(cat "$TMP_ROOT/worker-allow.err")"
+  pass "spawned-worker PreToolUse hook blocks Agent and --allow-subagents re-enables it"
 }
 
 test_claude_hooks_stale_incarnation_harmless() {
@@ -428,6 +461,7 @@ test_pi_extension_stale_incarnation_rejected
 test_kimi_and_grok_install_no_unverified_wiring
 test_opencode_plugin_semantic_lifecycle
 test_claude_hooks_semantic_lifecycle
+test_claude_worker_pretool_hook_blocks_agent_and_opt_in_re_enables
 test_claude_hooks_stale_incarnation_harmless
 test_gemini_hooks_semantic_lifecycle
 test_gemini_hooks_stale_incarnation_harmless

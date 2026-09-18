@@ -1,6 +1,6 @@
-# Primary-session delegation guard
+# Delegation guard
 
-This document is the authoritative human-readable contract for the guard that stops a firstmate primary from delegating work outside the fleet.
+This document is the authoritative human-readable contract for the guard that stops a firstmate primary from delegating work outside the fleet, and that keeps spawned ship and scout workers one-agent by default.
 
 The shipped mechanism is `bin/fm-subagent-pretool-check.sh`, a PreToolUse guard that denies a delegation-SHAPED tool name in a genuine primary home.
 Claude primaries should also use an untracked per-home local `permissions.deny` list as hardening for known Claude delegation tools, because it removes them from the model's schema entirely.
@@ -43,7 +43,7 @@ A stem-enumerating matcher would reintroduce the fail-open-by-enumeration proble
 A tool is delegation-shaped when its normalized lowercase name contains one of these stems:
 
 ```text
-agent  subagent  task  workflow  cron  schedul  worktree
+agent  subagent  task  workflow  cron  schedul  worktree  fork
 delegate  spawn  dispatch  handoff  remote  sendmessage  monitor
 ```
 
@@ -133,20 +133,31 @@ It costs one line and removes the failure mode where a rename or a rollback sile
 
 ## Scope
 
-The shipped hook fires only in a genuine firstmate primary home, using the shared predicate `fm_primary_scope_matches` from `bin/fm-primary-scope-lib.sh`.
-This is the same predicate `bin/fm-sessionstart-nudge.sh` and `bin/fm-turnend-guard.sh` use, so the three tracked primary-scoped hooks cannot drift apart.
+The shipped hook fires in two guarded contexts, using `fm_primary_scope_matches` from `bin/fm-primary-scope-lib.sh` for the primary and a linked firstmate-shaped worktree (or `--worker`) for a spawned ship or scout.
 
-A home is in scope when it has `AGENTS.md`, a `bin/` directory, an existing state directory, and either a plain checkout where git-dir equals git-common-dir or a valid `.fm-secondmate-home` marker.
-A marked secondmate home is in scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
+A home is a primary when it has `AGENTS.md`, a `bin/` directory, an existing state directory, and either a plain checkout where git-dir equals git-common-dir or a valid `.fm-secondmate-home` marker.
+A marked secondmate home is in primary scope on purpose: it operates its own fleet and must dispatch through it for the same durability reasons.
+The primary deny reason still names `bin/fm-brief.sh` then `bin/fm-spawn.sh`.
 
-A crewmate's disposable task worktree is a linked git worktree, which is the shape `bin/fm-spawn.sh` always hands out, so it is out of scope.
-A crewmate using delegation tools inside its own task worktree is legitimate and stays allowed.
-A non-firstmate repo is out of scope.
-Any failure to confirm the home is inert, never a block, so a broken environment can never deny a tool call.
+A crewmate's disposable task worktree is a linked git worktree, which is the shape `bin/fm-spawn.sh` always hands out.
+That used to be a silent allow so a worker could use the harness Agent tool; that is the control incident this guard now closes.
+A firstmate-shaped linked worktree is therefore denied with the one-agent reason unless `FM_ALLOW_SUBAGENT=1`.
+`--worker` is the spawn-installed hook path for a non-firstmate project, where the checker is invoked from the launching firstmate tree rather than the worktree.
+A non-firstmate repo without `--worker` is out of scope.
+Any failure to confirm a guarded context is inert, never a block, so a broken environment can never deny a tool call.
 
 A local Claude deny list is upstream of hook scope and removes known Claude delegation tools wherever Claude applies it.
-Do not put that list in tracked project settings, because linked worktrees inherit those settings and would lose legitimate delegation tools.
-The hook scope is the shipped enforcement boundary, and the linked-worktree negative case proves the script itself does not block legitimate crewmate delegation.
+Do not put that list in tracked project settings, because linked worktrees inherit those settings and would lose tools the per-task opt-in is meant to restore.
+The hook scope is the shipped enforcement boundary for both the primary and the worker.
+
+## Spawned-worker launch denials
+
+`bin/fm-spawn.sh` owns the per-launch switches for ship and scout workers.
+Default Claude launches pass `--disallowedTools Agent,Task,Fork` and install a PreToolUse backstop in the worktree `.claude/settings.local.json` that calls this checker with `--worker`.
+Default Codex launches pass `--disable multi_agent`.
+`--allow-subagents`, or a brief that carries the exact line `Worker delegation: subagents=on` from `bin/fm-brief.sh --allow-subagents`, sets `FM_ALLOW_SUBAGENT=1`, omits those launch denials, and records `subagents=on` in task metadata so a relaunch keeps the posture.
+Cursor Agent CLI exposes no verified tool-deny or subagent-disable switch; workers rely on the brief one-agent rule, and a firstmate-repo Cursor worker may still hit this checker through Claude-compatible settings loading.
+Primary and secondmate launches are unchanged by those worker flags.
 
 ## Escape hatch
 
@@ -181,15 +192,18 @@ Applicability turns on one question: does the harness expose built-in delegation
 | Harness | Delegation surface | Status |
 | --- | --- | --- |
 | Claude | 16 known tools, listed above | Scoped guard wired and live-verified; untracked local deny list verified and recommended. |
-| Codex | none | Not applicable, verified empirically below. Codex 0.144.1 exposes no subagent, sub-task, or delegated-agent tool, so there is nothing to remove or intercept. `.codex/hooks.json` is unchanged. |
+| Codex | `multi_agent` feature (stable, default on in current CLI) | Crewmate and scout launches pass `--disable multi_agent`. Primary Codex sessions are unchanged by this worker fix. Historical 0.144.1 enumeration below recorded no subagent *tool*; the feature flag is the switch the current CLI exposes. |
+| Cursor | unverified tool name | No verified `--disallowedTools` or equivalent launch switch. Workers rely on the brief one-agent rule. A firstmate-repo worker may still hit this checker through Claude-compatible settings loading. |
 | Grok | present, exact tokens unconfirmed | Not wired pending live verification. See below. |
 | omp | present, per bundled material | Not wired and unverified. omp ships a built-in task delegation tool: its bundled docs list `tools/task.md` and the captain-level `task.maxConcurrency` setting governs it. No Firstmate delegation seatbelt is wired for it yet, and its status stays unverified until a live tool enumeration is recorded the way the Codex row was. |
 | OpenCode | present, exact tokens unconfirmed | Not wired pending live verification. See below. |
 | Pi | none reported | Not wired pending live verification. See below. |
 
-### Codex, verified not applicable
+### Codex, 0.144.1 tool enumeration
 
-Codex 0.144.1 was asked to enumerate its own tools in a scratch git repo on 2026-07-22.
+That date's CLI exposed no delegated-agent *tool*.
+Crewmate and scout launches now pass `--disable multi_agent` because current Codex enables that feature by default.
+The enumeration below remains the tripwire for a future delegated-agent *tool* that would also need a PreToolUse wire.
 
 ```sh
 codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check \
@@ -334,8 +348,8 @@ The Workflow tool call was not blocked by a hook. It executed normally: launched
 and completed successfully returning {"result":"ok"}.
 ```
 
-Same hook, same bytes, deny in the primary home and allow in a crewmate-shaped worktree.
-This is the scoping contract working end to end rather than a hook that simply never fires.
+Same hook, same bytes, deny in the primary home and allow in a crewmate-shaped worktree on that date.
+The worker scope now denies that same worktree shape unless `FM_ALLOW_SUBAGENT=1`; `tests/fm-subagent-pretool-check.test.sh` owns the current contract.
 
 ### Escape hatch
 
@@ -354,7 +368,8 @@ The live consequence is confirmed by the shipped-guard result above: Claude hono
 ## Automated validation
 
 `tests/fm-subagent-pretool-check.test.sh` owns the acceptance matrix and is registered in the `pure-contract-unit` family in `bin/fm-test-run.sh`.
-It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; inertness in a linked task worktree and in a non-firstmate repo; in-scope enforcement for a marked secondmate home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
+It covers the tracked Claude settings boundary that forbids a `permissions` key; the match-all Claude hook registration; denial of every work-creating delegation tool by shape; denial of twelve hypothetical future tool names that appear on no list; the observe-or-stop, plan-only, and MCP exclusions; the exactness of the plan-only exclusion against six near-miss names a substring or shorter-stem widening would release; the scout-present and scout-absent message variants; the escape hatch including its fail-closed values; denial in a linked task worktree with the worker reason and inertness in a non-firstmate repo; `--worker` coverage for a non-firstmate project and the opt-in re-enable; in-scope enforcement for a marked secondmate home; both stdin transports; the empty-stdout requirement; fail-open transport behavior; and the preserved `Bash` seatbelts and `Stop` guard.
+`tests/fm-spawn-dispatch-profile.test.sh` and `tests/fm-busy-adapter-wiring.test.sh` cover the Claude `--disallowedTools` launch flag, the spawn-installed PreToolUse backstop, Codex `--disable multi_agent`, and `--allow-subagents`.
 
 Run:
 

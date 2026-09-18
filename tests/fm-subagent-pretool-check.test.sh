@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Behavior tests for the primary-session delegation-shape guard: the tracked
-# hook registration, shared settings boundary, and PreToolUse classifier.
+# Behavior tests for the delegation-shape guard: the tracked hook
+# registration, shared settings boundary, and PreToolUse classifier covering
+# both the primary home and spawned workers.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -93,7 +94,7 @@ test_guard_denies_hypothetical_future_tools() {
   local tool
   for tool in SubagentCreate SpawnWorker DelegateTask AgentPool WorkflowRun \
               ScheduleJob CronSchedule CreateWorktree DispatchAgent TaskHandoff \
-              RemoteExec BackgroundAgent; do
+              RemoteExec BackgroundAgent ForkSession ForkAgent; do
     expect_deny "future delegation tool" "$tool"
   done
   pass "the guard denies delegation-shaped tools that no deny list knows about yet"
@@ -179,8 +180,8 @@ test_escape_hatch_allows_deliberate_use() {
   pass "the single documented escape hatch releases the guard only on the exact opt-in value"
 }
 
-test_task_worktree_and_non_firstmate_repo_are_inert() {
-  local child="$TMP_ROOT/child" plain="$TMP_ROOT/plain" rc=0
+test_task_worktree_denies_and_non_firstmate_repo_is_inert() {
+  local child="$TMP_ROOT/child" plain="$TMP_ROOT/plain" rc=0 actual
   git -C "$PRIMARY" config user.name fixture
   git -C "$PRIMARY" config user.email fixture@example.test
   git -C "$PRIMARY" add AGENTS.md
@@ -192,17 +193,59 @@ test_task_worktree_and_non_firstmate_repo_are_inert() {
   : > "$ERR"
   FM_ROOT_OVERRIDE="$child" FM_HOME="$child" FM_STATE_OVERRIDE="$child/state" \
     "$CHECK" --claude --tool Agent > "$OUT" 2> "$ERR" || rc=$?
-  [ "$rc" -eq 0 ] || fail "a crewmate task worktree must be out of scope, got exit $rc: $(cat "$ERR")"
-  [ ! -s "$OUT" ] || fail "task-worktree no-op wrote stdout: $(cat "$OUT")"
-  [ ! -s "$ERR" ] || fail "task-worktree no-op wrote stderr: $(cat "$ERR")"
+  [ "$rc" -eq 2 ] || fail "a crewmate task worktree must deny, got exit $rc: $(cat "$ERR")"
+  [ ! -s "$OUT" ] || fail "task-worktree deny wrote stdout: $(cat "$OUT")"
+  actual=$(jq -r '.systemMessage' "$ERR")
+  case "$actual" in
+    *'this spawned worker does the assigned work itself'*) ;;
+    *) fail "task-worktree deny must use the worker reason: $actual" ;;
+  esac
+  case "$actual" in
+    *'dispatches through the fleet'*) fail "task-worktree deny must not use the primary fleet-dispatch reason: $actual" ;;
+  esac
 
   mkdir -p "$plain/bin"
   git -C "$plain" init -q
   rc=0
+  : > "$OUT"
+  : > "$ERR"
   FM_ROOT_OVERRIDE="$plain" FM_HOME="$plain" FM_STATE_OVERRIDE="$plain/state" \
     "$CHECK" --claude --tool Agent > "$OUT" 2> "$ERR" || rc=$?
   [ "$rc" -eq 0 ] || fail "a non-firstmate repo must be out of scope, got exit $rc"
-  pass "the guard is inert in a crewmate task worktree and in a non-firstmate repo"
+  pass "the guard denies a spawned worker worktree and stays inert in a non-firstmate repo"
+}
+
+test_worker_opt_in_allows_and_worker_flag_covers_non_firstmate_projects() {
+  local child="$TMP_ROOT/child-optin" plain="$TMP_ROOT/plain-worker" rc=0
+  git -C "$PRIMARY" config user.name fixture
+  git -C "$PRIMARY" config user.email fixture@example.test
+  if ! git -C "$PRIMARY" rev-parse --verify HEAD >/dev/null 2>&1; then
+    git -C "$PRIMARY" add AGENTS.md
+    git -C "$PRIMARY" commit -qm fixture
+  fi
+  git -C "$PRIMARY" worktree add -q -b fixture-child-optin "$child"
+  mkdir -p "$child/bin" "$child/state"
+  printf '# fixture\n' > "$child/AGENTS.md"
+  expect_allow "worker escape hatch" Agent FM_ROOT_OVERRIDE="$child" FM_HOME="$child" FM_STATE_OVERRIDE="$child/state" FM_ALLOW_SUBAGENT=1
+
+  mkdir -p "$plain/bin"
+  git -C "$plain" init -q
+  rc=0
+  : > "$OUT"
+  : > "$ERR"
+  FM_ROOT_OVERRIDE="$plain" FM_HOME="$plain" FM_STATE_OVERRIDE="$plain/state" \
+    "$CHECK" --claude --worker --tool Agent > "$OUT" 2> "$ERR" || rc=$?
+  [ "$rc" -eq 2 ] || fail "--worker must deny even outside a firstmate-shaped worktree, got exit $rc"
+  jq -e '.systemMessage | contains("this spawned worker does the assigned work itself")' "$ERR" >/dev/null 2>&1 \
+    || fail "--worker deny must use the worker reason: $(cat "$ERR")"
+
+  rc=0
+  : > "$OUT"
+  : > "$ERR"
+  FM_ROOT_OVERRIDE="$plain" FM_HOME="$plain" FM_STATE_OVERRIDE="$plain/state" \
+    FM_ALLOW_SUBAGENT=1 "$CHECK" --claude --worker --tool Agent > "$OUT" 2> "$ERR" || rc=$?
+  [ "$rc" -eq 0 ] || fail "--worker with FM_ALLOW_SUBAGENT=1 must allow, got exit $rc: $(cat "$ERR")"
+  pass "worker opt-in re-enables delegation and --worker covers non-firstmate projects"
 }
 
 test_secondmate_home_is_in_scope() {
@@ -284,7 +327,8 @@ test_plan_only_exclusion_is_exact_name
 test_guard_never_classifies_mcp_tools
 test_deny_message_defers_to_intake_classification
 test_escape_hatch_allows_deliberate_use
-test_task_worktree_and_non_firstmate_repo_are_inert
+test_task_worktree_denies_and_non_firstmate_repo_is_inert
+test_worker_opt_in_allows_and_worker_flag_covers_non_firstmate_projects
 test_secondmate_home_is_in_scope
 test_stdin_transports_and_output_shapes
 test_malformed_transport_fails_open

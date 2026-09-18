@@ -28,7 +28,10 @@
 # The guard is narrow by design. It classifies ONE thing: the shape of the tool
 # name. It makes no judgment about whether the work should be delegated at all,
 # which is a reasoning boundary no tool-shape hook can enforce.
-# See docs/subagent-guard.md for the complete contract and validation record.
+# Spawned workers are in scope too: a crewmate or scout that reaches for the
+# harness's own Agent, fork, or equivalent creates unaccounted nested work,
+# which is the control incident this extension closes. The primary deny
+# reason is unchanged. docs/subagent-guard.md owns the complete contract.
 #
 # Usage:
 #   <PreToolUse JSON on stdin> | bin/fm-subagent-pretool-check.sh
@@ -41,8 +44,11 @@
 #   ALLOW - exit 0 and no output.
 #   DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped
 #          deny object on stdout unless --claude was supplied.
-#   INERT - not a genuine primary home (a crewmate/scout task worktree or a
-#           non-firstmate repo): exit 0 with no output, exactly like ALLOW.
+#   INERT - not a genuine primary home and not a spawned worker context (a
+#           non-firstmate repo, or a broken environment): exit 0 with no
+#           output, exactly like ALLOW.
+#   WORKER - a spawned ship/scout worktree, or --worker from a spawn-installed
+#           hook: deny with the one-agent reason unless FM_ALLOW_SUBAGENT=1.
 #   ESCAPE - FM_ALLOW_SUBAGENT=1 in the environment allows deliberately.
 #   FAIL OPEN - malformed or empty stdin, or missing jq for stdin transport.
 #
@@ -55,7 +61,7 @@ set -u
 # Lowercase substrings that mark a tool name as delegation-shaped: it creates
 # work, an agent, a schedule, or an isolated workspace that firstmate would not
 # know about. This list is the single owner of the shipped classification.
-DELEGATION_STEMS='agent subagent task workflow cron schedul worktree delegate spawn dispatch handoff remote sendmessage monitor'
+DELEGATION_STEMS='agent subagent task workflow cron schedul worktree fork delegate spawn dispatch handoff remote sendmessage monitor'
 
 # Exact lowercase tool names that match a stem above but only OBSERVE or STOP
 # work that already exists. Reading or ending unaccounted work is not creating
@@ -81,24 +87,29 @@ PLAN_ONLY_TOOLS='taskcreate taskupdate'
 TOOL=""
 TOOL_SET=0
 CLAUDE_MODE=0
+WORKER_MODE=0
 
 usage() {
   cat <<'EOF'
-Usage: fm-subagent-pretool-check.sh [--tool <tool-name>] [--claude]
+Usage: fm-subagent-pretool-check.sh [--tool <tool-name>] [--claude] [--worker]
 
 With no --tool, reads a PreToolUse-style JSON payload on stdin (Claude/Codex
 tool_name, or Grok toolName).
-Denies a delegation-SHAPED tool name in a genuine primary home.
+Denies a delegation-SHAPED tool name in a genuine primary home, and in a
+spawned ship or scout worktree unless that task opted in.
 Claude primaries may also add an untracked per-home permissions.deny list that
 removes known delegation tools from the model schema before this hook is needed.
 Do not ship that Claude-only list in tracked project settings, because linked
-worktrees inherit it and legitimate crewmates would lose their delegation tools.
+worktrees inherit it; worker denials belong to this hook and to per-launch
+flags owned by bin/fm-spawn.sh, never to a project's tracked settings.
 This hook remains as the shipped guard for future delegation-shaped names
 outside any local fixed list.
-Fires only in a genuine firstmate primary home; it is a silent no-op in a
-crewmate/scout task worktree or any non-firstmate repo, where a worker using
-delegation tools is legitimate.
-Exits 0 to allow and 2 to deny, naming the real crewmate dispatch path instead.
+A primary or marked secondmate home is denied with the fleet-dispatch reason.
+A linked firstmate-shaped task worktree is denied with the one-agent reason.
+--worker is the spawn-installed hook path for a non-firstmate project, where
+the checker lives in the launching firstmate tree rather than the worktree.
+A non-firstmate repo without --worker stays a silent no-op.
+Exits 0 to allow and 2 to deny.
 Set FM_ALLOW_SUBAGENT=1 in the session environment to allow deliberately.
 Malformed transport fails open.
 EOF
@@ -119,6 +130,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --claude)
       CLAUDE_MODE=1
+      shift
+      ;;
+    --worker)
+      WORKER_MODE=1
       shift
       ;;
     -h|--help)
@@ -175,27 +190,54 @@ FM_ROOT=${FM_ROOT_OVERRIDE:-$(CDPATH='' cd -- "$SCRIPT_DIR/.." 2>/dev/null && pw
 FM_HOME=${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}
 STATE=${FM_STATE_OVERRIDE:-$FM_HOME/state}
 
-# Scope to a genuine primary home, exactly as the session-start nudge and the
-# turn-end guard do. fm_primary_scope_matches accepts a plain checkout or a
-# marked secondmate home - both operate a fleet and must dispatch through it -
-# and rejects a linked task worktree, which is the shape bin/fm-spawn.sh always
-# hands a crewmate. A crewmate using delegation tools inside its own task
-# worktree is legitimate and stays allowed. Any failure to confirm the home is
-# inert (exit 0), never a block, so a broken environment never denies a call.
+# A spawned ship or scout lives in a linked git worktree, which is the shape
+# bin/fm-spawn.sh always hands out. That used to be a silent allow so a
+# crewmate could use the harness's own Agent tool; that is the control
+# incident this guard now closes. Require the same firstmate-shaped files as
+# the primary predicate so a random linked worktree of some other repo stays
+# inert. A marked secondmate home is also a linked worktree, but
+# fm_primary_scope_matches accepts it first and keeps the fleet-dispatch deny.
+fm_worker_scope_matches() {
+  local root=$1 state=$2 git_dir git_common_dir
+  git_dir=$(git -C "$root" rev-parse --git-dir 2>/dev/null) || return 1
+  git_common_dir=$(git -C "$root" rev-parse --git-common-dir 2>/dev/null) || return 1
+  [ "$git_dir" != "$git_common_dir" ] || return 1
+  [ -f "$root/AGENTS.md" ] || return 1
+  [ -d "$root/bin" ] || return 1
+  [ -d "$state" ] || return 1
+}
+
+# Primary scope is unchanged: a plain checkout or a marked secondmate home.
+# --worker is the spawn-installed hook for a non-firstmate project, where this
+# script is invoked from the launching firstmate tree rather than the worktree.
+# Any failure to confirm a guarded context is inert (exit 0), never a block,
+# so a broken environment never denies a call.
 # shellcheck source=bin/fm-primary-scope-lib.sh
 . "$SCRIPT_DIR/fm-primary-scope-lib.sh"
-fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
-
-# Name the dedicated scout entry point only when this home carries it; degrade
-# to the two-step brief-then-spawn path when it does not, rather than naming a
-# script that is not there.
-if [ -f "$FM_ROOT/bin/fm-scout.sh" ]; then
-  ROUTE='first classify the work under the AGENTS.md intake contract: work already classified as a scout goes to bin/fm-scout.sh "<question>" [project], while authorized ship work and its bounded research go to bin/fm-brief.sh then bin/fm-spawn.sh'
+IN_SCOPE=
+if [ "$WORKER_MODE" -eq 1 ]; then
+  IN_SCOPE=worker
+elif fm_primary_scope_matches "$FM_ROOT" "$STATE"; then
+  IN_SCOPE=primary
+elif fm_worker_scope_matches "$FM_ROOT" "$STATE"; then
+  IN_SCOPE=worker
 else
-  ROUTE='first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work'
+  exit 0
 fi
 
-REASON="[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception."
+if [ "$IN_SCOPE" = primary ]; then
+  # Name the dedicated scout entry point only when this home carries it; degrade
+  # to the two-step brief-then-spawn path when it does not, rather than naming a
+  # script that is not there.
+  if [ -f "$FM_ROOT/bin/fm-scout.sh" ]; then
+    ROUTE='first classify the work under the AGENTS.md intake contract: work already classified as a scout goes to bin/fm-scout.sh "<question>" [project], while authorized ship work and its bounded research go to bin/fm-brief.sh then bin/fm-spawn.sh'
+  else
+    ROUTE='first classify the work under the AGENTS.md intake contract, then use bin/fm-brief.sh followed by bin/fm-spawn.sh for dispatched work'
+  fi
+  REASON="[subagent-dispatch] the firstmate primary dispatches through the fleet, not the harness's own delegation tools: work started that way has no durable fleet record, leaves every firstmate guard inert, and dies with this session. Instead, $ROUTE (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch the session with FM_ALLOW_SUBAGENT=1 for a deliberate exception."
+else
+  REASON="[subagent-dispatch] this spawned worker does the assigned work itself: harness subagents and forks are not fleet-accounted. Do the work in this session (blocked tool: $TOOL, delegation-shaped on \"$MATCHED\"). Launch with --allow-subagents, or a brief that names Worker delegation: subagents=on, for a deliberate exception."
+fi
 
 json_escape() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' '

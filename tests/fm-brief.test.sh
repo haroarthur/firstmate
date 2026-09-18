@@ -213,6 +213,10 @@ test_ship_modes_generate_clean_briefs() {
     assert_grep "{FIRSTMATE_SPEC}" "$brief" "$id: brief missing the {FIRSTMATE_SPEC} placeholder"
     assert_grep "## Captain's intent" "$brief" "$id: brief missing Captain's intent subsection"
     assert_grep "## Firstmate spec" "$brief" "$id: brief missing Firstmate spec subsection"
+    assert_grep "Do not spawn subagents; one agent does this work." "$brief" \
+      "$id: brief missing the default one-agent rule"
+    assert_no_grep "Worker delegation: subagents=on" "$brief" \
+      "$id: default brief must not opt in to subagents"
     assert_grep 'never a bare number such as "PR 108"' "$brief" "$id: brief missing the full-PR-URL rule"
     assert_grep "mid-task \`working:\` line (including setup complete) is nonterminal" "$brief" \
       "$id: brief missing nonterminal working:/setup-complete gate protection"
@@ -290,6 +294,7 @@ yolo on a ship brief|brief-refused-b1 some-proj --mode direct-PR --yolo on|--yol
 yolo=value form on a ship brief|brief-refused-b2 some-proj --mode direct-PR --yolo=off|--yolo is not a brief input
 mode on a scout brief|brief-refused-b3 some-proj --scout --mode direct-PR|--mode applies only to ship briefs
 mode on a secondmate charter|brief-refused-b4 --secondmate --no-projects --mode no-mistakes|--mode applies only to ship briefs
+allow-subagents on a secondmate charter|brief-refused-b5 --secondmate --no-projects --allow-subagents|--allow-subagents applies only to ship and scout
 ROWS
   pass "fm-brief.sh: --yolo and scout/secondmate --mode are refused, never silently dropped"
 }
@@ -887,6 +892,8 @@ test_scout_and_secondmate_scaffold() {
   assert_grep "## Captain's intent" "$brief" "scout brief missing Captain's intent subsection"
   assert_grep "## Firstmate spec" "$brief" "scout brief missing Firstmate spec subsection"
   assert_grep "{FIRSTMATE_SPEC}" "$brief" "scout brief missing the spec placeholder"
+  assert_grep "Do not spawn subagents; one agent does this work." "$brief" \
+    "scout brief missing the default one-agent rule"
 
   FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
     FM_HOME="$BRIEF_HOME" "$ROOT/bin/fm-brief.sh" brief-sm-q6 --secondmate alpha >/dev/null 2>&1 \
@@ -924,7 +931,28 @@ test_worker_role_scope() {
   pass "fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract"
 }
 
+test_allow_subagents_writes_the_opt_in_marker() {
+  local home brief
+  home="$TMP_ROOT/allow-subagents-home"
+  mkdir -p "$home/data"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-subagents-on some-proj --mode no-mistakes --allow-subagents >/dev/null \
+    || fail "ship --allow-subagents scaffold should succeed"
+  brief="$home/data/brief-subagents-on/brief.md"
+  grep -qx 'Worker delegation: subagents=on' "$brief" \
+    || fail "ship --allow-subagents must write the exact spawn-owned marker"
+  assert_grep "This task allows subagents." "$brief" \
+    "ship --allow-subagents brief must state the allowance"
+  assert_no_grep "Do not spawn subagents; one agent does this work." "$brief" \
+    "opted-in brief must not carry the default one-agent prohibition"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-scout-subagents some-proj --scout --allow-subagents >/dev/null \
+    || fail "scout --allow-subagents scaffold should succeed"
+  grep -qx 'Worker delegation: subagents=on' "$home/data/brief-scout-subagents/brief.md" \
+    || fail "scout --allow-subagents must write the exact spawn-owned marker"
+  pass "fm-brief.sh: --allow-subagents writes the spawn-owned opt-in marker"
+}
+
 test_worker_role_scope
+test_allow_subagents_writes_the_opt_in_marker
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
