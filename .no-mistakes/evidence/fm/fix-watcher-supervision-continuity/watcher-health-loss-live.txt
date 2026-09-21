@@ -1,0 +1,9 @@
+SCENARIO: watcher health loss after readiness
+guard before arm rc=2: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ●  TURN WOULD END BLIND - SUPERVISION IS OFF ●  5 task(s) in flight, but no live watcher holds this home lock (last beat: never). ●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180. ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
+arm ready: watcher: started pid=1378313 (beacon fresh) 
+guard while healthy rc=0
+guard after stale beacon rc=2: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ●  TURN WOULD END BLIND - SUPERVISION IS OFF ●  5 task(s) in flight, but no live watcher holds this home lock (last beat: 843332189s ago). ●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180. ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
+arm exit rc=1
+arm final output: watcher: started pid=1378313 (beacon fresh) watcher: FAILED - owned watcher lost its lock identity or fresh beacon 
+cycle ledger: arm_pid=1378282	watcher_pid=1378313	origin=started	started_at=1790016989	ended_at=1790016989	exit_code=1	signal=none	reason=watcher-unhealthy	beacon_age=843332189	lock_before=pid:1378313|identity:linux-starttime=42201694 cmdline-hex=62617368002f686f6d652f6861726f2f2e6e6f2d6d697374616b65732f776f726b74726565732f3031366461336664343730342f30314d33324a59565132583359584b434d52345448423957504a2f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+RESULT: PASS

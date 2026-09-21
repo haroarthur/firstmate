@@ -1,0 +1,4 @@
+SCENARIO: authenticated custom owner versus stale trust
+current trust rc=0 output=check: /home/haro/.no-mistakes/worktrees/016da3fd4704/01M32JYVQ2X3YXKCMR4THB9WPJ/.live-custom-trust-boundary.rSAeeE/current/home/state/domain.check.sh: current-custom-owner  quarantine-count=0 poll=preserved
+stale trust rc=0 output=check: rejected stale secondmate PR poll domain; quarantine destination /home/haro/.no-mistakes/worktrees/016da3fd4704/01M32JYVQ2X3YXKCMR4THB9WPJ/.live-custom-trust-boundary.rSAeeE/stale/home/state/.rejected-pr-poll-domain.jxaSk8; inspect artifacts and re-register the owning task's PR if still needed  quarantine-count=1 executed=no trust-unchanged=yes
+RESULT: PASS

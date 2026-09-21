@@ -1,0 +1,6 @@
+SCENARIO: orphan persistent-secondmate PR poll is quarantined once
+first watcher rc=0 output=check: rejected stale secondmate PR poll analytics; quarantine destination /home/haro/.no-mistakes/worktrees/016da3fd4704/01M32JYVQ2X3YXKCMR4THB9WPJ/.live-orphan-quarantine.U9vwYa/home/state/.rejected-pr-poll-analytics.5yCgGq; inspect artifacts and re-register the owning task's PR if still needed 
+first cycle: executed=no quarantine-count=1 preserved-artifacts=3/3 metadata-unchanged=yes
+second watcher rc=0 output=check: /home/haro/.no-mistakes/worktrees/016da3fd4704/01M32JYVQ2X3YXKCMR4THB9WPJ/.live-orphan-quarantine.U9vwYa/home/state/z-stop.check.sh: stop-cycle 
+second cycle quarantine-count=1
+RESULT: PASS

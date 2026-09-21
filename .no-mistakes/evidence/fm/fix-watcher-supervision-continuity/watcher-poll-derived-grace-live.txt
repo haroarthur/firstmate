@@ -1,0 +1,6 @@
+SCENARIO: long poll uses derived watcher grace
+arm ready: watcher: started pid=1414913 (beacon fresh) 
+after a 330-second-old beacon with FM_POLL=600: arm-live-rc=0 watcher-live-rc=0
+watcher-unhealthy ledger entry before cleanup: no
+arm cleanup rc=143 watcher-after-cleanup=stopped
+RESULT: PASS
