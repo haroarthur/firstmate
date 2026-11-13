@@ -1,0 +1,11 @@
+Before: worktrees/scout-t/.lavish/board.html (scratch board) and data/scout-t/board/board.html (kept board) both existed.
+$ fm-teardown.sh scout-t --force --legacy-record   (lab home, kind=scout)
+{run-worktree}/bin/fm-teardown.sh: line 2049: cd: alpha: No such file or directory
+error: treehouse return failed for worktree $LAB/worktrees/scout-t; teardown aborted
+
+After teardown's scratch scrub:
+worktree contents:
+.git
+data/scout-t/board:
+board.html
+<h1>kept</h1>

@@ -1,0 +1,47 @@
+## S2 scout arms a board inside its worktree (the bug path)
+$ fm-procevent-lavish.sh arm worktrees/scout-a/.lavish/board.html --for scout-a
+error: cleanup discards scout scout-a's worktree, so its board must be inside $LAB/data/scout-a/; move the artifact to $LAB/data/scout-a/board/, open it there with lavish-axi, and arm that copy
+exit=1
+registered sources:
+no sources registered
+
+## S3 scout arms its board in data/scout-a/board/
+$ fm-procevent-lavish.sh arm data/scout-a/board/board.html --for scout-a
+registered: lavish-c1a63fb57517ca2a (lavish, task=scout-a)
+armed: lavish-c1a63fb57517ca2a
+artifact: /private/var/folders/th/4dw2s1b523v5y_tvj6l0ffvc0000gn/T/fm-lab.B1uLct/data/scout-a/board/board.html
+owner-task: scout-a
+exit=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-c1a63fb57517ca2a      lavish       task:scout-a/listening 0
+
+## S4 ship task arms a worktree board (rule must not apply)
+$ fm-procevent-lavish.sh arm worktrees/ship-b/.lavish/board.html --for ship-b
+registered: lavish-4d35c4d81c1cfaf9 (lavish, task=ship-b)
+armed: lavish-4d35c4d81c1cfaf9
+artifact: /private/var/folders/th/4dw2s1b523v5y_tvj6l0ffvc0000gn/T/fm-lab.B1uLct/worktrees/ship-b/.lavish/board.html
+owner-task: ship-b
+exit=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-4d35c4d81c1cfaf9      lavish       task:ship-b/listening 0
+lavish-c1a63fb57517ca2a      lavish       task:scout-a/listening 0
+
+## S5a adversarial: symlink inside data/scout-c/board pointing at the worktree file
+$ fm-procevent-lavish.sh arm data/scout-c/board/board.html --for scout-c
+error: cleanup discards scout scout-c's worktree, so its board must be inside $LAB/data/scout-c/; move the artifact to $LAB/data/scout-c/board/, open it there with lavish-axi, and arm that copy
+exit=1
+
+## S5b adversarial: sibling prefix dir data/scout-c-x/ for task scout-c
+$ fm-procevent-lavish.sh arm data/scout-c-x/board.html --for scout-c
+error: cleanup discards scout scout-c's worktree, so its board must be inside $LAB/data/scout-c/; move the artifact to $LAB/data/scout-c/board/, open it there with lavish-axi, and arm that copy
+exit=1
+
+## S5c adversarial: ../ traversal out of data/scout-c/
+$ fm-procevent-lavish.sh arm data/scout-c/../../worktrees/scout-c/.lavish/board.html --for scout-c
+error: cleanup discards scout scout-c's worktree, so its board must be inside $LAB/data/scout-c/; move the artifact to $LAB/data/scout-c/board/, open it there with lavish-axi, and arm that copy
+exit=1
+
+final registered sources:
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-4d35c4d81c1cfaf9      lavish       task:ship-b/listening 0
+lavish-c1a63fb57517ca2a      lavish       task:scout-a/listening 0

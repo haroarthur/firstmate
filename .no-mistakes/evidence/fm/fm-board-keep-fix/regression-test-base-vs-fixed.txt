@@ -1,0 +1,7 @@
+== tests/fm-procevent.test.sh with base bin/fm-procevent-lavish.sh (427056c4): exit 1
+26:not ok - a scout armed a board inside the worktree that cleanup discards
+
+== same test with fixed script (4380d811): exit 0
+27:ok - a scout's first arm requires a board inside its task data directory, and a registered board keeps its review loop
+0
+31:ok - fm-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor and keeps the board in task data
